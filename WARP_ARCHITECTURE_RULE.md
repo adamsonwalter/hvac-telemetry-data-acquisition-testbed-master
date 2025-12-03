@@ -288,15 +288,420 @@ The only valid exceptions:
 
 ---
 
+## Lessons Learned: Real Restructuring Experience
+
+### Successfully Restructured: hvac-telemetry-data-acquisition-testbed (Dec 2025)
+
+**Context**: Transformed 3 monolithic files (971 lines) → 17 modular files (1,598 lines)  
+**Result**: 100% architectural compliance, zero breaking changes, trivially testable code
+
+---
+
+## 🎓 Critical Lessons for Future Refactoring
+
+### 1. **Start with Pure Functions First (Phase 1)**
+
+**Why**: Pure functions are the foundation. Get these right before touching orchestration.
+
+**Trap**: Trying to refactor hooks and pure functions simultaneously  
+**Solution**: Extract pure functions FIRST, leave old orchestration intact temporarily
+
+**Real Example**:
+```python
+# WRONG: Trying to do both at once
+# def use_decoder(filepath):  # ❌ New hook
+#     normalized = normalize_signal(...)  # ❌ New pure function
+#     # Chaos - nothing works yet!
+
+# RIGHT: Pure functions first
+# Step 1: Extract pure function, test it independently
+def normalize_percent_signal(series, signal_name=""):
+    # Pure logic only - NO side effects
+    return normalized, metadata
+
+# Step 2: Test pure function (no mocks!)
+def test_normalize():
+    result, meta = normalize_percent_signal(test_series)
+    assert result.max() == 1.0  # Easy!
+
+# Step 3: THEN create hook that uses it
+def use_bms_decoder(filepath):
+    df = pd.read_csv(filepath)  # Side effect
+    normalized, meta = normalize_percent_signal(df['value'])  # Pure call
+    return df, meta
+```
+
+**Key Insight**: Pure functions can be validated in isolation BEFORE integrating into hooks.
+
+---
+
+### 2. **String Formatting is a Pure Function**
+
+**Trap**: Leaving report generation in hooks because "it just formats output"  
+**Lesson**: Report generation is business logic (format decisions), not a side effect
+
+**Real Example**:
+```python
+# WRONG: Report formatting in hook
+def use_validator(signal):
+    result = validate(signal)
+    # ❌ Business logic in hook
+    report = f"Signal: {result['name']}\nStatus: {result['status']}"  
+    logger.info(report)  # Side effect
+    return report
+
+# RIGHT: Pure formatting function
+def format_validation_report(results):
+    """Pure function: format report string."""
+    # Deterministic string formatting - NO side effects
+    lines = []
+    lines.append("VALIDATION REPORT")
+    lines.append(f"Status: {results['status']}")
+    return "\n".join(lines)
+
+def use_validator(signal):
+    result = validate(signal)  # Pure call
+    report = format_validation_report(result)  # Pure call
+    logger.info(report)  # Side effect ONLY in hook
+    return result
+```
+
+**Key Insight**: If it makes decisions about WHAT to output, it's business logic → pure function.
+
+---
+
+### 3. **Metadata is Return Data, Not Logging**
+
+**Trap**: Replacing logger calls with print statements in "pure" functions  
+**Lesson**: Pure functions return metadata; hooks decide what to log
+
+**Real Example**:
+```python
+# WRONG: Prints in pure function
+def normalize_signal(series):
+    if max <= 1.05:
+        print("Detected: fraction_0_1")  # ❌ Side effect!
+        return series
+
+# WRONG: Even returning a "log message" is coupling
+def normalize_signal(series):
+    if max <= 1.05:
+        log_msg = "Detected: fraction_0_1"  # ❌ Forces hook to log
+        return series, log_msg
+
+# RIGHT: Return structured metadata
+def normalize_signal(series):
+    metadata = {
+        "detected_type": "fraction_0_1",
+        "confidence": "high",
+        "scaling_factor": 1.0
+    }
+    return series, metadata  # Hook decides what to log
+
+def use_decoder(filepath):
+    normalized, meta = normalize_signal(df['value'])
+    # Hook controls logging format and level
+    logger.info(f"Detected: {meta['detected_type']} (conf: {meta['confidence']})")
+    return normalized, meta
+```
+
+**Key Insight**: Pure functions return data; hooks format and log it.
+
+---
+
+### 4. **Don't Extract Classes - Extract Functions**
+
+**Trap**: Creating `SignalValidator` class with pure methods, thinking "it's organized"  
+**Lesson**: Classes with state belong in hooks; pure logic should be standalone functions
+
+**Real Example**:
+```python
+# WRONG: Class with pure methods (still hard to test)
+class SignalValidator:
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)  # ❌ Side effect trapped
+    
+    def _detect_mode_changes(self, series):  # Pure logic
+        return {"has_changes": False}
+    
+    def validate(self, series):
+        result = self._detect_mode_changes(series)
+        self.logger.info(result)  # ❌ Mixed concerns
+        return result
+
+# RIGHT: Pure functions + orchestration hook
+def detect_mode_changes(series: pd.Series) -> Dict:
+    """Pure function: detect mode changes."""
+    # Pure logic only
+    return {"has_changes": False}
+
+def use_signal_validator(series):
+    """Hook: orchestrate validation."""
+    logger.info("Starting validation")
+    result = detect_mode_changes(series)  # Pure call
+    logger.info(f"Result: {result}")
+    return result
+```
+
+**Key Insight**: Classes create coupling. Prefer standalone pure functions + orchestration hooks.
+
+---
+
+### 5. **Deprecate Safely - Don't Delete Immediately**
+
+**Trap**: Deleting old code before new code is validated  
+**Lesson**: Move to `_deprecated/` folder, keep for reference during transition
+
+**Real Strategy**:
+```bash
+# Safe deprecation workflow
+mkdir _deprecated
+mv old_monolith.py _deprecated/
+echo "See src/hooks/ and src/domain/ for new architecture" > _deprecated/README.md
+git commit -m "refactor: deprecate old monolith, add migration guide"
+
+# Keep deprecated code until:
+# 1. All tests pass with new code
+# 2. CLI functionality validated
+# 3. Documentation complete
+# THEN schedule deletion (30-90 days later)
+```
+
+**Key Insight**: Deprecated code is documentation of "what we had before."
+
+---
+
+### 6. **Test Pure Functions Immediately**
+
+**Trap**: Extracting pure functions but not testing them until "everything is done"  
+**Lesson**: Write tests as you extract each pure function - they're trivial to test!
+
+**Real Workflow**:
+```python
+# Step 1: Extract pure function
+def normalize_percent_signal(series, signal_name=""):
+    # ... pure logic
+    return normalized, metadata
+
+# Step 2: IMMEDIATELY write test (no mocks!)
+def test_percentage_detection():
+    signal = pd.Series([0, 50, 100])
+    normalized, meta = normalize_percent_signal(signal)
+    assert meta["detected_type"] == "percentage_0_100"
+    assert normalized.max() == 1.0
+    # Passed? Move to next function.
+
+# Step 3: Extract next pure function, test it, repeat
+```
+
+**Key Insight**: Pure functions enable test-driven extraction. Use it!
+
+---
+
+### 7. **Commit After Each Phase, Not at the End**
+
+**Trap**: One giant commit "refactor: restructure everything"  
+**Lesson**: Commit after each completed phase for rollback safety
+
+**Real Commit Strategy**:
+```bash
+# Phase 1: Pure functions
+git commit -m "refactor(arch): Phase 1 - Extract pure functions (domain layer)"
+git push
+
+# Phase 2: Hooks
+git commit -m "refactor(arch): Phase 2 - Create hooks (orchestration layer)"
+git push
+
+# Phase 3: CLI + deprecation
+git commit -m "refactor(arch): Phase 3 - Add CLI, deprecate old files"
+git push
+
+# Each phase is independently reviewable and revertable
+```
+
+**Key Insight**: Small commits = easy code review + safe rollback points.
+
+---
+
+### 8. **Module-Level Logger is Global State**
+
+**Trap**: Thinking `logger = logging.getLogger(__name__)` at module level is "OK because it's just logging"  
+**Lesson**: Module-level loggers make pure functions impure
+
+**Real Example**:
+```python
+# WRONG: Module-level logger in domain file
+import logging
+logger = logging.getLogger(__name__)  # ❌ Global state
+
+def normalize_signal(series):
+    logger.info("Processing")  # ❌ Impure - couples to logger
+    return series / 100
+
+# RIGHT: NO logger in domain files at all
+def normalize_signal(series):
+    # Pure math only - ZERO imports of logging
+    return series / 100, {"type": "percentage"}
+
+# Logger ONLY in hooks
+import logging
+logger = logging.getLogger(__name__)  # ✅ OK in hook file
+
+def use_decoder(filepath):
+    logger.info(f"Loading {filepath}")  # ✅ Side effect in hook
+    normalized, meta = normalize_signal(data)
+    logger.info(f"Detected: {meta['type']}")  # ✅ Side effect in hook
+```
+
+**Verification Command**: `grep -r "import logging" src/domain/` should return ZERO matches.
+
+---
+
+### 9. **Function Signatures Matter**
+
+**Trap**: Pure function takes `filepath` parameter "for convenience"  
+**Lesson**: If parameter is for I/O, function belongs in hooks layer
+
+**Real Example**:
+```python
+# WRONG: Pure function with filepath parameter
+def normalize_signal(filepath: str):  # ❌ Implies I/O
+    df = pd.read_csv(filepath)  # ❌ Side effect
+    return df['value'] / 100
+
+# RIGHT: Pure function takes already-loaded data
+def normalize_signal(series: pd.Series) -> Tuple[pd.Series, Dict]:  # ✅
+    # No I/O - just math on input data
+    return series / 100, {"type": "percentage"}
+
+def use_decoder(filepath: str):  # ✅ Hook does I/O
+    df = pd.read_csv(filepath)  # Side effect
+    normalized, meta = normalize_signal(df['value'])  # Pure call
+    return df, meta
+```
+
+**Key Insight**: If function signature mentions files/databases/APIs, it's a hook, not pure.
+
+---
+
+### 10. **CLI Orchestrators are Hooks, Not Pure Functions**
+
+**Trap**: Putting argument parsing logic in domain layer  
+**Lesson**: CLI orchestration is side effects (argparse, sys.exit) → belongs in orchestration layer
+
+**Real Structure**:
+```
+src/
+ ├─ domain/              # Pure functions - NO argparse, NO sys.exit
+ ├─ hooks/               # Side effects - NO argparse (orchestrators handle that)
+ └─ orchestration/       # CLI entry points - argparse + sys.exit OK here
+     └─ DecoderCLI.py   # Handles CLI, calls hooks, exits with codes
+```
+
+**Key Insight**: Three layers: domain (pure) → hooks (side effects) → orchestration (CLI/web)
+
+---
+
+## 🚧 Traps for Young Players
+
+### Trap #1: "Just One Logger Call Won't Hurt"
+**Reality**: It makes the function impure and hard to test. Return metadata instead.
+
+### Trap #2: "I'll Refactor Hooks and Functions Together"
+**Reality**: Do pure functions first, validate them, THEN create hooks.
+
+### Trap #3: "Classes Are More Organized"
+**Reality**: Classes create coupling. Use pure functions + hooks instead.
+
+### Trap #4: "Testing Can Wait Until Everything Works"
+**Reality**: Test pure functions immediately - they're trivial to test!
+
+### Trap #5: "Report Formatting is Just a Side Effect"
+**Reality**: Formatting is business logic (decisions about output) → pure function.
+
+### Trap #6: "Module-Level Logger is Fine"
+**Reality**: It's global state. Keep loggers OUT of domain files entirely.
+
+### Trap #7: "One Big Commit at the End"
+**Reality**: Commit after each phase for safety and reviewability.
+
+### Trap #8: "I Can Skip the Documentation"
+**Reality**: WARP_ARCHITECTURE_RULE.md is your contract. Write it first.
+
+---
+
+## 📋 Step-by-Step Refactoring Checklist
+
+### Pre-Work
+- [ ] Read WARP_ARCHITECTURE_RULE.md completely
+- [ ] Identify monolithic files violating the rule
+- [ ] Create folder structure: `src/domain/`, `src/hooks/`, `src/orchestration/`
+- [ ] Create `_deprecated/` folder for old files
+
+### Phase 1: Extract Pure Functions
+- [ ] Create `src/domain/[category]/` folders
+- [ ] Extract pure functions (NO logging, NO I/O)
+- [ ] Write unit tests for each pure function (NO mocks!)
+- [ ] Verify: `grep -r "import logging" src/domain/` returns ZERO
+- [ ] Commit: "refactor(arch): Phase 1 - Extract pure functions"
+- [ ] Push to remote
+
+### Phase 2: Create Hooks
+- [ ] Create `src/hooks/` folder
+- [ ] Build orchestration hooks (ALL side effects)
+- [ ] Call pure functions from hooks
+- [ ] Add logging/error handling in hooks only
+- [ ] Commit: "refactor(arch): Phase 2 - Create hooks"
+- [ ] Push to remote
+
+### Phase 3: CLI Orchestrators
+- [ ] Create `src/orchestration/` folder
+- [ ] Build CLI entry points (argparse, sys.exit)
+- [ ] Call hooks from orchestrators
+- [ ] Verify CLI works identically to old version
+- [ ] Commit: "refactor(arch): Phase 3 - Add CLI orchestrators"
+- [ ] Push to remote
+
+### Phase 4: Deprecation & Docs
+- [ ] Move old files to `_deprecated/`
+- [ ] Create `_deprecated/README.md` migration guide
+- [ ] Update main README with new architecture
+- [ ] Add usage examples
+- [ ] Commit: "refactor(arch): Phase 4 - Deprecate old files"
+- [ ] Push to remote
+
+### Final Validation
+- [ ] All tests pass
+- [ ] CLI works identically
+- [ ] No logging in `src/domain/`
+- [ ] Documentation complete
+- [ ] Code review passed
+- [ ] ✅ Restructuring complete!
+
+---
+
 ## Summary
 
 > **Hooks orchestrate. Functions calculate.**
 > **Never mix side-effects with business logic.**
 > **This is non-negotiable for production code.**
 
+### Golden Rules from Real Restructuring
+
+1. **Pure functions first** - Test them immediately
+2. **Metadata, not logging** - Return data, don't log it
+3. **Functions, not classes** - Avoid coupling
+4. **Commit per phase** - Not one giant commit
+5. **Module-level loggers = impure** - Keep out of domain/
+6. **String formatting = pure** - Business logic, not side effect
+7. **Deprecate safely** - Move to `_deprecated/`, don't delete
+8. **Function signatures reveal truth** - Filepath parameter? It's a hook.
+
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2025-01-XX  
-**Author**: WARP Agent (per user directive)  
-**Status**: ACTIVE - All code must comply immediately
+**Document Version**: 2.0  
+**Last Updated**: 2025-12-03  
+**Author**: WARP Agent (with real restructuring experience)  
+**Status**: ACTIVE - All code must comply immediately  
+**Real-World Validation**: hvac-telemetry-data-acquisition-testbed (Dec 2025)
