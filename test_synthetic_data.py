@@ -16,6 +16,11 @@ from pathlib import Path
 # Import our new architecture
 from src.hooks.useBmsPercentDecoder import use_bms_percent_decoder
 from src.domain.decoder.formatDecoderReport import format_decoder_report
+from src.domain.validator.calculateValidationScore import (
+    calculate_validation_score,
+    format_score_report,
+    ValidationScore
+)
 
 def test_all_synthetic_files():
     """Test decoder against all synthetic CSV files."""
@@ -50,6 +55,9 @@ def test_all_synthetic_files():
             # Validate results
             normalized = df['normalized'].dropna()
             
+            # Calculate validation score
+            score, level, issues, recommendations = calculate_validation_score(metadata)
+            
             result = {
                 'file': filepath,
                 'status': 'PASS',
@@ -60,17 +68,24 @@ def test_all_synthetic_files():
                 'original_max': metadata['original_max'],
                 'normalized_min': float(normalized.min()) if len(normalized) > 0 else None,
                 'normalized_max': float(normalized.max()) if len(normalized) > 0 else None,
-                'count': len(df)
+                'count': len(df),
+                'validation_score': score,
+                'validation_level': level,
+                'issues': issues,
+                'recommendations': recommendations
             }
             
             # Display compact summary
             print(f"✅ SUCCESS")
             print(f"   Detected: {result['detected_type']}")
             print(f"   Confidence: {result['confidence']}")
+            print(f"   Validation Score: {score}/100 ({level.value})")
             print(f"   Scaling: {result['scaling_factor']:.2f}")
             print(f"   Original range: [{result['original_min']:.2f}, {result['original_max']:.2f}]")
             print(f"   Normalized range: [{result['normalized_min']:.4f}, {result['normalized_max']:.4f}]")
             print(f"   Points: {result['count']}")
+            if issues:
+                print(f"   ⚠️  Issues: {len(issues)}")
             
         except Exception as e:
             result = {
@@ -98,12 +113,17 @@ def test_all_synthetic_files():
         print("\n📊 Detection Statistics:")
         detection_counts = {}
         confidence_counts = {}
+        score_levels = {}
         
         for r in passed:
             det_type = r['detected_type']
             confidence = r['confidence']
             detection_counts[det_type] = detection_counts.get(det_type, 0) + 1
             confidence_counts[confidence] = confidence_counts.get(confidence, 0) + 1
+            
+            if 'validation_level' in r:
+                level = r['validation_level'].value
+                score_levels[level] = score_levels.get(level, 0) + 1
         
         print("\n  Detection Types:")
         for det_type, count in sorted(detection_counts.items()):
@@ -112,6 +132,15 @@ def test_all_synthetic_files():
         print("\n  Confidence Levels:")
         for conf, count in sorted(confidence_counts.items()):
             print(f"    {conf}: {count}")
+        
+        print("\n  Validation Score Levels:")
+        for level, count in sorted(score_levels.items()):
+            print(f"    {level}: {count}")
+        
+        if any('validation_score' in r for r in passed):
+            scores = [r['validation_score'] for r in passed if 'validation_score' in r]
+            avg_score = sum(scores) / len(scores) if scores else 0
+            print(f"\n  Average Validation Score: {avg_score:.1f}/100")
     
     if failed:
         print("\n❌ Failed Files:")
