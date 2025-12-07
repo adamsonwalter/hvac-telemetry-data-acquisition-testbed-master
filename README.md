@@ -163,11 +163,16 @@ Battle-tested in production virtual-metering engines:
 
 ## Documentation
 
+### Core Documentation
 - [WARP.md](WARP.md) - Development guidelines for WARP AI
 - [WARP_ARCHITECTURE_RULE.md](WARP_ARCHITECTURE_RULE.md) - Complete architectural documentation
-- [docs/README_ARCHITECTURE.md](docs/README_ARCHITECTURE.md) - Usage guide and patterns
-- [docs/DECODER_IMPLEMENTATION_GUIDE.md](docs/DECODER_IMPLEMENTATION_GUIDE.md) - Implementation details
-- [docs/RESTRUCTURING_STATUS.md](docs/RESTRUCTURING_STATUS.md) - Restructuring history and lessons
+
+### Technical Guides
+- [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md) - Complete technical reference: BMS encodings, detection rules, unit confusion, physics
+- [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) - How to extend and maintain the decoder
+- [docs/ADVANCED_RESCUE_PATTERNS.md](docs/ADVANCED_RESCUE_PATTERNS.md) - Advanced techniques for "impossible" signals
+- [docs/VALIDATION_RUBRIC.md](docs/VALIDATION_RUBRIC.md) - Signal validation rules and scoring
+- [docs/ARCHITECTURE_HISTORY.md](docs/ARCHITECTURE_HISTORY.md) - Restructuring lessons learned
 
 ## Testing Philosophy
 
