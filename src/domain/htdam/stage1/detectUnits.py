@@ -73,31 +73,34 @@ def _parse_unit_from_metadata(
     # Check signal name for common patterns
     signal_upper = signal_name.upper()
     
-    # Temperature patterns
-    if "DEGC" in signal_upper or "_C" in signal_upper or "°C" in signal_name:
-        return "C"
-    if "DEGF" in signal_upper or "_F" in signal_upper or "°F" in signal_name:
-        return "F"
-    if "KELVIN" in signal_upper or "_K" in signal_upper:
-        return "K"
-    
-    # Flow patterns
+    # Flow patterns (check FIRST - "FLOW" contains "_F" which matches Fahrenheit)
+    if "GPM" in signal_upper:
+        return "GPM"
     if "M3/S" in signal_upper or "M3S" in signal_upper:
         return "m3/s"
     if "L/S" in signal_upper or "LPS" in signal_upper or "LS" in signal_upper:
         return "L/s"
-    if "GPM" in signal_upper:
-        return "GPM"
     if "M3/H" in signal_upper or "M3H" in signal_upper:
         return "m3/h"
     
-    # Power patterns
+    # Power patterns (check SECOND - more specific patterns like _KW before _K)
     if "_KW" in signal_upper or "KW_" in signal_upper or signal_upper.endswith("KW"):
         return "kW"
     if "_MW" in signal_upper or "MW_" in signal_upper or signal_upper.endswith("MW"):
         return "MW"
     if "_W" in signal_upper or signal_upper.endswith("_WATT"):
         return "W"
+    
+    # Temperature patterns (check LAST - use specific patterns to avoid false positives)
+    # Celsius: degC, _degC, ends with _C, or °C symbol
+    if "DEGC" in signal_upper or signal_upper.endswith("_C") or "°C" in signal_name:
+        return "C"
+    # Fahrenheit: degF, _degF, ends with _F, or °F symbol
+    if "DEGF" in signal_upper or signal_upper.endswith("_F") or "°F" in signal_name:
+        return "F"
+    # Kelvin: KELVIN or ends with _K
+    if "KELVIN" in signal_upper or signal_upper.endswith("_K"):
+        return "K"
     
     return None
 

@@ -16,7 +16,8 @@ class TestArchitectureCompliance:
     @pytest.fixture
     def repo_root(self):
         """Get repository root directory."""
-        return Path(__file__).parent.parent.parent.parent
+        # From tests/architecture/ → tests/ → (repo root)
+        return Path(__file__).parent.parent.parent
     
     def test_domain_layer_has_no_logging(self, repo_root):
         """Domain layer must have ZERO logging imports."""

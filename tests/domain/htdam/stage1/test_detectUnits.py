@@ -132,7 +132,10 @@ class TestDetectTemperatureUnit:
     
     def test_robust_to_outliers(self):
         """Should handle outliers using 99.5th percentile."""
-        temps = pd.Series([6, 8, 10, 12, 14, 999])  # One outlier
+        # Need enough samples for 99.5th percentile to exclude outlier
+        # With 200 samples: p995 position = 0.995 * 199 = 198.005
+        # Interpolates between index 198 (value=14) and 199 (value=14), excludes outlier at 200
+        temps = pd.Series([6, 8, 10, 12, 14] * 40 + [999])  # 200 good + 1 outlier = 201 total
         unit, confidence = detect_temperature_unit(temps, "CHWST")
         assert unit == "C"  # Should still detect Celsius
         assert confidence >= 0.8

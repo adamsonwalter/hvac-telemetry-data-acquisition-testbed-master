@@ -62,7 +62,7 @@ class TestComputeUnitConfidence:
             metadata_provided=False  # Had to infer
         )
         # 1.0 - 0.30 (missing) - 0.20 (ambiguous) = 0.50
-        assert confidence == 0.50
+        assert confidence == pytest.approx(0.50, abs=1e-9)
     
     def test_none_unit(self):
         """Should handle None unit gracefully."""
@@ -72,8 +72,8 @@ class TestComputeUnitConfidence:
             conversion_applied=False,
             metadata_provided=False
         )
-        # 1.0 - 0.30 (missing) = 0.70 minimum
-        assert confidence == 0.70
+        # 1.0 - 0.30 (missing) - 0.20 (ambiguous, conf=0.0 < 0.80) = 0.50
+        assert confidence == pytest.approx(0.50, abs=1e-9)
 
 
 class TestComputePhysicsConfidence:
@@ -300,8 +300,8 @@ class TestComputeAllConfidences:
         
         # POWER should be weakest due to low detection confidence + inference
         # 1.0 - 0.30 (inferred) - 0.20 (ambiguous) = 0.50
-        assert result["channel_confidences"]["POWER"] == 0.50
-        assert result["stage1_confidence"] == 0.50  # Limited by POWER
+        assert result["channel_confidences"]["POWER"] == pytest.approx(0.50, abs=1e-9)
+        assert result["stage1_confidence"] == pytest.approx(0.50, abs=1e-9)  # Limited by POWER
         assert result["stage1_penalty"] == -0.05  # < 0.80
     
     def test_missing_channel(self):
