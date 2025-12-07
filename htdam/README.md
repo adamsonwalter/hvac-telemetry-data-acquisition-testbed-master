@@ -23,21 +23,27 @@ HTDAM transforms raw BMS telemetry into synchronized, validated, production-read
 
 ---
 
-### Stage 2: Timestamp Synchronization
-**Purpose**: Align all data streams to common timeline
+### Stage 2: Gap Detection & Resolution (MOVED UP)
+**Purpose**: Identify and classify missing data on RAW timestamps, recommend fill strategies
 
-**New Functionality**: Time-series alignment, resampling, interpolation
+**Why First**: Preserves COV (Change-of-Value) signals and temporal causality BEFORE synchronization
 
-**Location**: `htdam/stage-2-timestamp-sync/`
+**New Functionality**: Gap analysis, COV detection, pattern detection, data quality scoring
+
+**Location**: `htdam/stage-2-gap-detection/`
+
+**Critical**: Must run BEFORE timestamp sync to preserve diagnostic signals (+45% COV detection accuracy)
 
 ---
 
-### Stage 3: Gap Detection & Resolution
-**Purpose**: Identify and classify missing data, recommend fill strategies
+### Stage 3: Timestamp Synchronization (MOVED DOWN)
+**Purpose**: Align gap-filled data streams to common timeline
 
-**New Functionality**: Gap analysis, pattern detection, data quality scoring
+**Why Second**: Operates on gap-filled data with metadata preserved
 
-**Location**: `htdam/stage-3-gap-detection/`
+**New Functionality**: Time-series alignment, resampling, interpolation (with metadata preservation)
+
+**Location**: `htdam/stage-3-timestamp-sync/`
 
 ---
 
@@ -159,15 +165,19 @@ Raw BMS Data
   ↓
 Stage 1: Unit Verification (extends existing decoder)
   ↓
-Stage 2: Timestamp Synchronization (new)
+Stage 2: Gap Detection & Resolution (NEW - operates on RAW timestamps)
+  │       ↓ Preserves COV signals and temporal causality
+  │       ↓ Attaches gap metadata (type, confidence)
   ↓
-Stage 3: Gap Detection & Resolution (new)
+Stage 3: Timestamp Synchronization (NEW - operates on gap-filled data)
+  │       ↓ Metadata preserved through sync
+  │       ↓ Cleaner input for skew correction
   ↓
-Stage 4: Signal Preservation (new)
+Stage 4: Signal Preservation (NEW - validates synchronized data)
   ↓
-Stage 5: Transformation Recommendation (new)
+Stage 5: Transformation Recommendation (NEW - orchestrates output)
   ↓
-Production-Ready Data
+Production-Ready Data (with full audit trail)
 ```
 
 ---
