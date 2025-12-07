@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-"""Pure function: Parse HVAC sensor metadata from CSV filename.
+Pure function: Parse HVAC sensor metadata from CSV filename.
 
 This module contains ZERO side effects:
 - NO logging
@@ -8,244 +8,252 @@ This module contains ZERO side effects:
 - NO global state
 - Pure parsing logic only
 
-Handles GENERIC pattern: separate CSV per sensor with metadata embedded in filename.
-NO assumptions about structure - just looks for ASHRAE abbreviations and descriptive text.
+Implements proven priority-based regex matching from TELEMETRY_PARSING_SPEC.md.
+See docs/TELEMETRY_PARSING_SPEC.md for complete specification and rationale.
 """
 
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 
-# ASHRAE standard sensor abbreviations (complete segment matches only)
-ASHRAE_ABBREVIATIONS = {
+# Priority-based Feed Type Detection
+# Based on proven specification: docs/TELEMETRY_PARSING_SPEC.md v1.1
+# Patterns are evaluated sequentially - FIRST MATCH WINS
+
+# Feed Type definitions (ASHRAE standard)
+FEED_TYPES = {
+    'CDWRT': 'Condenser Water Return Temperature',
     'CHWST': 'Chilled Water Supply Temperature',
     'CHWRT': 'Chilled Water Return Temperature',
-    'CDWST': 'Condenser Water Supply Temperature',
-    'CDWRT': 'Condenser Water Return Temperature',
-    'CHWF': 'Chilled Water Flow',
-    'CDWF': 'Condenser Water Flow',
     'POWER': 'Electrical Power',
-    'LOAD': 'Chiller Load',
+    'FLOW': 'Chilled Water Flow Rate',
 }
 
-# Descriptive text patterns that confirm ASHRAE abbreviation
-DESCRIPTIVE_PATTERNS = {
-    'CHWST': r'(?i)(leaving|supply|chw.*supply|chilled.*water.*supply)',
-    'CHWRT': r'(?i)(entering|return|chw.*return|chilled.*water.*return)',
-    'CDWST': r'(?i)(cdw.*supply|cond.*water.*supply|entering.*condenser)',
-    'CDWRT': r'(?i)(cdw.*return|cond.*water.*return|leaving.*condenser)',
-    'CHWF': r'(?i)(chw.*flow|chilled.*water.*flow|evap.*flow)',
-    'CDWF': r'(?i)(cdw.*flow|cond.*water.*flow)',
-    'POWER': r'(?i)(power|kilowatt|kw|electrical|demand)',
-    'LOAD': r'(?i)(load|capacity|ton|refrigeration)',
-}
+# Priority-ordered regex patterns
+# Critical: CDWRT is checked FIRST because COND/CDW are highly specific
+PATTERNS = [
+    # Priority 1: CDWRT - Condenser terms are highly specific
+    ('CDWRT', r'COND|CDW'),
+    
+    # Priority 2: CHWST - Supply/Leaving side
+    ('CHWST', r'CHW.*SUPPLY|CHWST|CHW.*ST|SUPPLY.*TEMP|LEAVING.*TEMP|CHW.*LEAV'),
+    
+    # Priority 3: CHWRT - Return/Entering side
+    ('CHWRT', r'CHW.*RETURN|CHWRT|CHW.*RT|RETURN.*TEMP|ENTERING.*TEMP|CHW.*ENT'),
+    
+    # Priority 4: POWER - Electrical consumption
+    # Note: LOAD is classified as POWER (see spec section 4.4)
+    ('POWER', r'POWER|KW|KILOWATT|WATT|ENERGY|ELEC|DEMAND|LOAD'),
+    
+    # Priority 5: FLOW - Volumetric flow rate
+    ('FLOW', r'FLOW|GPM|LPS|L/S|LITRE|GALLON|RATE'),
+]
 
 
 def parse_filename_metadata(
     filepath: str
 ) -> Dict:
     """
-    Pure function: Extract HVAC sensor metadata from filename.
+    Pure function: Detect HVAC feed type from filename using priority-based regex.
     
     ZERO SIDE EFFECTS - pure parsing logic only.
     
+    Implements proven specification from docs/TELEMETRY_PARSING_SPEC.md v1.1
+    
+    Algorithm:
+    1. Normalize filename to UPPERCASE
+    2. Strip file extension (.csv, .xlsx, .txt)
+    3. Evaluate patterns sequentially (first match wins)
+    4. Extract building/location/equipment metadata (heuristic)
+    
     Args:
-        filepath: Path to sensor CSV file
+        filepath: Path to sensor CSV/XLSX file
     
     Returns:
         Dict with:
-        - sensor_type: 'CHWST', 'CHWRT', 'CDWRT', 'LOAD', 'POWER', etc.
-        - ashrae_standard: Standard ASHRAE name
+        - feed_type: 'CDWRT' | 'CHWST' | 'CHWRT' | 'POWER' | 'FLOW' | None
+        - ashrae_standard: Standard ASHRAE name (e.g., 'Chilled Water Supply Temperature')
+        - confidence: float [0, 1]
+            1.0 = Exact ASHRAE abbreviation match
+            0.8 = Strong pattern match (e.g., CHW_SUPPLY)
+            0.6 = Generic pattern match (e.g., SUPPLY_TEMP)
+            0.0 = No match (unknown)
+        - parsing_method: 'priority_regex' | 'unknown'
+        - matched_pattern: The regex pattern that matched (for debugging)
         - building: Building identifier (heuristic, may be None)
         - location: Location/floor identifier (heuristic, may be None)
         - equipment: Equipment identifier (heuristic, may be None)
-        - confidence: float [0, 1]
-        - parsing_method: 'ashrae_abbrev' | 'descriptive_text' | 'ambiguous'
-        - segments: List of all filename segments
+        - segments: List of filename segments (split by underscore)
+        - raw_filename: Original filename
     
-    GENERIC Approach - NO assumptions about structure:
-    - Splits filename by underscore
-    - Looks for ASHRAE abbreviations as complete segments
-    - Validates with descriptive text if present
-    - Does NOT assume any particular order or structure
-    
-    Parsing Strategy (generic, no structure assumptions):
-    1. Extract filename without path/extension
-    2. Split by underscore → segments
-    3. Look for ASHRAE abbreviations as COMPLETE segments:
-       - "CHWST" (complete segment) → ✅ Match
-       - "Ch" in "Chiller" → ❌ NOT a match (substring, not complete segment)
-    4. Validate with descriptive text if available in other segments
-    5. If ambiguous → flag for manual review
-    
-    Key Principle: Match COMPLETE segments only, not substrings
+    Priority Order (critical for disambiguation):
+    1. CDWRT: COND|CDW (checked first - highly specific)
+    2. CHWST: CHW.*SUPPLY|CHWST|LEAVING.*TEMP
+    3. CHWRT: CHW.*RETURN|CHWRT|ENTERING.*TEMP
+    4. POWER: POWER|KW|ENERGY|DEMAND|LOAD (note: LOAD→POWER)
+    5. FLOW: FLOW|GPM|LPS|RATE
     
     Examples:
-        >>> filepath = "Site_..._CHWST_Leaving_Chilled_Water_Temperature_Sensor.csv"
-        >>> result = parse_filename_metadata(filepath)
-        >>> result['ashrae_standard']
-        'CHWST'
-        >>> result['confidence']
-        1.0  # High: CHWST + "Leaving" confirm each other
+        >>> parse_filename_metadata("Chiller_1_CHW_Supply_Temp.csv")
+        {'feed_type': 'CHWST', 'confidence': 1.0, ...}
         
-        >>> filepath = "Site_..._Chiller_2_Load.csv"
-        >>> result = parse_filename_metadata(filepath)
-        >>> result['ashrae_standard']
-        'LOAD'  # "Ch" in "Chiller" correctly ignored
-        >>> result['confidence']
-        0.85  # Medium: "Load" is generic, needs context
+        >>> parse_filename_metadata("Condenser_Water_Return.csv")
+        {'feed_type': 'CDWRT', 'confidence': 0.8, ...}
+        
+        >>> parse_filename_metadata("Water_Flow.csv")
+        {'feed_type': 'FLOW', 'confidence': 0.6, ...}
+        
+        >>> parse_filename_metadata("Chiller_Status.csv")
+        {'feed_type': None, 'confidence': 0.0, ...}
     """
-    # Extract filename without path and extension
+    # Step 1: Extract filename without path
     filename = filepath.split('/')[-1]
-    filename_no_ext = filename.replace('.csv', '').replace('.xlsx', '')
     
-    # Split into segments
+    # Step 2: Strip file extension
+    filename_no_ext = re.sub(r'\.(csv|xlsx|txt)$', '', filename, flags=re.IGNORECASE)
+    
+    # Step 3: Normalize to UPPERCASE for case-insensitive matching
+    filename_upper = filename_no_ext.upper()
+    
+    # Step 4: Split into segments for metadata extraction
     segments = filename_no_ext.split('_')
     
-    # Initialize result
+    # Step 5: Priority-based pattern matching (first match wins)
+    detected_feed_type = None
+    matched_pattern = None
+    confidence = 0.0
+    
+    for feed_type, pattern in PATTERNS:
+        if re.search(pattern, filename_upper):
+            detected_feed_type = feed_type
+            matched_pattern = pattern
+            
+            # Confidence scoring based on match quality
+            if feed_type in filename_upper:  # Exact abbreviation present
+                confidence = 1.0
+            elif pattern in ['COND|CDW', r'CHW.*SUPPLY', r'CHW.*RETURN']:  # Strong indicators
+                confidence = 0.8
+            else:  # Generic patterns (FLOW, RATE, POWER)
+                confidence = 0.6
+            
+            break  # First match wins - stop searching
+    
+    # Step 6: Extract building/location/equipment metadata (heuristic)
+    building, location, equipment = _extract_metadata_heuristic(segments)
+    
+    # Step 7: Build result
     result = {
-        'sensor_type': None,
-        'ashrae_standard': None,
-        'building': None,
-        'location': None,
-        'equipment': None,
-        'confidence': 0.0,
-        'parsing_method': 'none',
+        'feed_type': detected_feed_type,
+        'ashrae_standard': FEED_TYPES.get(detected_feed_type) if detected_feed_type else None,
+        'confidence': confidence,
+        'parsing_method': 'priority_regex' if detected_feed_type else 'unknown',
+        'matched_pattern': matched_pattern,
+        'building': building,
+        'location': location,
+        'equipment': equipment,
         'segments': segments,
         'raw_filename': filename
     }
     
-    # Strategy 1: Look for ASHRAE abbreviations as complete segments
-    ashrae_matches = []
-    for i, segment in enumerate(segments):
-        # Check if segment is exact ASHRAE abbreviation (case-insensitive)
-        segment_upper = segment.upper()
-        if segment_upper in ASHRAE_ABBREVIATIONS:
-            ashrae_matches.append((i, segment_upper))
-    
-    # If we found ASHRAE abbreviation(s)
-    if ashrae_matches:
-        # Use first match (usually the sensor type appears once)
-        segment_idx, ashrae_abbrev = ashrae_matches[0]
-        
-        result['sensor_type'] = ashrae_abbrev
-        result['ashrae_standard'] = ashrae_abbrev
-        result['parsing_method'] = 'ashrae_abbrev'
-        result['confidence'] = 0.85  # Base confidence
-        
-        # Try to extract building/location/equipment from segments before ASHRAE
-        if segment_idx >= 1:
-            result['building'] = segments[0]
-        if segment_idx >= 2:
-            result['location'] = segments[1]
-        if segment_idx >= 3:
-            # Equipment is segments between location and ASHRAE
-            result['equipment'] = '_'.join(segments[2:segment_idx])
-        
-        # Strategy 2: Validate with descriptive text (segments after ASHRAE)
-        if segment_idx < len(segments) - 1:
-            descriptive_text = '_'.join(segments[segment_idx + 1:])
-            
-            # Check if descriptive text confirms ASHRAE abbreviation
-            if ashrae_abbrev in DESCRIPTIVE_PATTERNS:
-                pattern = DESCRIPTIVE_PATTERNS[ashrae_abbrev]
-                if re.search(pattern, descriptive_text):
-                    result['confidence'] = 1.0  # High confidence - confirmed by description
-                    result['parsing_method'] = 'ashrae_abbrev_validated'
-    
-    # Strategy 3: If no ASHRAE abbreviation, look in descriptive text
-    if not ashrae_matches:
-        full_text = '_'.join(segments)
-        
-        for ashrae_abbrev, pattern in DESCRIPTIVE_PATTERNS.items():
-            if re.search(pattern, full_text):
-                result['sensor_type'] = ashrae_abbrev
-                result['ashrae_standard'] = ashrae_abbrev
-                result['parsing_method'] = 'descriptive_text'
-                result['confidence'] = 0.75  # Medium confidence - no explicit abbreviation
-                break
-    
-    # If still no match, flag as ambiguous
-    if result['sensor_type'] is None:
-        result['parsing_method'] = 'ambiguous'
-        result['confidence'] = 0.0
-    
     return result
 
 
-def extract_building_equipment(
-    segments: List[str],
-    ashrae_index: int
-) -> Tuple[str, str, str]:
+def _extract_metadata_heuristic(
+    segments: List[str]
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Pure function: Extract building, location, equipment from filename segments.
     
-    ZERO SIDE EFFECTS
+    ZERO SIDE EFFECTS - heuristic parsing only.
     
     Args:
         segments: List of filename segments (split by underscore)
-        ashrae_index: Index where ASHRAE abbreviation was found
     
     Returns:
         Tuple of (building, location, equipment)
+        Each may be None if not detected
     
-    Heuristic:
-    - Building: First segment (or first few if compound)
-    - Location: Segment with "Level", "Floor", "Zone" keywords
-    - Equipment: Segments with "Chiller", "Pump", "Tower" keywords
+    Heuristics:
+    - Building: First segment(s) before location/equipment keywords
+    - Location: Segments with "Level", "Floor", "Zone" keywords + following number
+    - Equipment: Segments with "Chiller", "Pump", "Tower" keywords + following ID
     
     Examples:
-        >>> segments = ['Company', '160', 'Ann', 'St', 'Level', '22', 'Chiller', '2', 'CHWST']
-        >>> extract_building_equipment(segments, 8)
-        ('Company_160_Ann_St', 'Level_22', 'Chiller_2')
+        >>> _extract_metadata_heuristic(['BarTech', '160', 'Ann', 'St', 'Level', '22', 'Chiller', '2'])
+        ('BarTech', 'Level_22', 'Chiller_2')
+        
+        >>> _extract_metadata_heuristic(['Site_A', 'Pump', '1', 'Flow'])
+        ('Site_A', None, 'Pump_1')
     """
     building = None
     location = None
     equipment = None
     
-    # Scan segments before ASHRAE index
-    before_ashrae = segments[:ashrae_index]
-    
-    # Look for location keywords
+    # Location keywords
     location_keywords = ['level', 'floor', 'zone', 'room', 'area']
-    location_segments = []
-    for i, seg in enumerate(before_ashrae):
+    location_idx = None
+    
+    for i, seg in enumerate(segments):
         if any(kw in seg.lower() for kw in location_keywords):
-            # Location is this segment + next (e.g., "Level" + "22")
-            location_segments.append(seg)
-            if i + 1 < len(before_ashrae):
-                location_segments.append(before_ashrae[i + 1])
+            # Found location - grab this segment + next if it's a number
+            location_parts = [seg]
+            if i + 1 < len(segments) and segments[i + 1].isdigit():
+                location_parts.append(segments[i + 1])
+            location = '_'.join(location_parts)
+            location_idx = i
             break
     
-    if location_segments:
-        location = '_'.join(location_segments)
+    # Equipment keywords
+    equipment_keywords = ['chiller', 'pump', 'tower', 'fan', 'boiler', 'ahu', 'cooler']
+    equipment_idx = None
     
-    # Look for equipment keywords
-    equipment_keywords = ['chiller', 'pump', 'tower', 'fan', 'boiler', 'ahu']
-    equipment_segments = []
-    for i, seg in enumerate(before_ashrae):
+    for i, seg in enumerate(segments):
         if any(kw in seg.lower() for kw in equipment_keywords):
-            # Equipment is this segment + next (e.g., "Chiller" + "2")
-            equipment_segments.append(seg)
-            if i + 1 < len(before_ashrae):
-                equipment_segments.append(before_ashrae[i + 1])
+            # Found equipment - grab this segment + next if it looks like an ID
+            equipment_parts = [seg]
+            if i + 1 < len(segments):
+                next_seg = segments[i + 1]
+                # Include next segment if it's a number or short identifier
+                if next_seg.isdigit() or len(next_seg) <= 3:
+                    equipment_parts.append(next_seg)
+            equipment = '_'.join(equipment_parts)
+            equipment_idx = i
             break
     
-    if equipment_segments:
-        equipment = '_'.join(equipment_segments)
+    # Building is first segment(s) before location/equipment
+    first_keyword_idx = None
+    if location_idx is not None:
+        first_keyword_idx = location_idx
+    if equipment_idx is not None and (first_keyword_idx is None or equipment_idx < first_keyword_idx):
+        first_keyword_idx = equipment_idx
     
-    # Building is everything else before location/equipment
-    if location_segments or equipment_segments:
-        # Find first index of location or equipment segments
-        first_special_idx = len(before_ashrae)
-        if location_segments:
-            first_special_idx = min(first_special_idx, before_ashrae.index(location_segments[0]))
-        if equipment_segments:
-            first_special_idx = min(first_special_idx, before_ashrae.index(equipment_segments[0]))
-        
-        building = '_'.join(before_ashrae[:first_special_idx])
-    else:
-        # No special segments found, building is first segment
-        building = before_ashrae[0] if before_ashrae else None
+    if first_keyword_idx is not None and first_keyword_idx > 0:
+        building = segments[0]  # Just use first segment for building
+    elif len(segments) > 0:
+        building = segments[0]  # Default to first segment
     
     return building, location, equipment
+
+
+def detect_feed_type(filename: str) -> Optional[str]:
+    """
+    Simplified interface: Just return feed type string.
+    
+    This matches the reference implementation in TELEMETRY_PARSING_SPEC.md
+    
+    Args:
+        filename: Filename to classify
+    
+    Returns:
+        'CDWRT' | 'CHWST' | 'CHWRT' | 'POWER' | 'FLOW' | None
+    
+    Examples:
+        >>> detect_feed_type('Chiller_1_CHW_Supply_Temp.csv')
+        'CHWST'
+        >>> detect_feed_type('Condenser_Water_Return.csv')
+        'CDWRT'
+        >>> detect_feed_type('Chiller_Status.csv')
+        None
+    """
+    result = parse_filename_metadata(filename)
+    return result['feed_type']

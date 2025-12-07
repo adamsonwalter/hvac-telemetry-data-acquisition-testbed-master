@@ -1,0 +1,44 @@
+
+Here are the minimum data elements I would require to robustly test the Baseline Hypothesis in a physics/thermodynamics/ASHRAE-consistent way, with explicit justification and how each data item supports or undermines the hypothesis. I’ll keep to a conservative set that targets distinguishing “no substantial 7%+ savings possible due to mechanical/thermal limits” from “7%+ savings feasible via standard improvements,” and I’ll map each item to how it reduces ambiguity. Minimum Bare Data (core set)
+CHWST (Chilled Water Supply Temperature setpoint and measured supply temperature)
+Why needed: Determines condenser/evaporator duty, chiller part-load performance, and potential for COP improvement through CHWS reset.
+Physics/thermo basis: CHWS setpoint and actual CHWS determine the evaporator approach and delta-T, which drive COP and kW/ton. Warming or resetting CHWS is a primary lever for energy reduction without hardware changes.
+CHWRT (Chilled Water Return Temperature)
+Why needed: Together with CHWST defines ΔT across the chiller condenser/evaporator; crucial for assessing heat transfer effectiveness and potential under/over cooling.
+ASHRAE/NIST guidance links ΔT and external loading to energy efficiency and proper staging of multiple chillers.
+CDWST (Condenser Water Temperature Setpoint)
+Why needed: Sets the condenser-side condition; directly impacts compressor COP and fan duty in water-cooled or air-cooled plants.
+Thermodynamics: Lower CDWST can improve COP up to a point; too low can cause inefficiencies or pump/flow issues. Essential to assess potential gains from condenser-side optimization.
+CDWRT (Condenser Water Return Temperature)
+Why needed: Completes the condenser-side ΔT calculation; informs tower/pump control effectiveness and potential for condenser-cooling optimization.
+ASHRAE guidance: Proper condenser water temperature differential is a primary determinant of plant efficiency and peak performance.
+Power (Total chiller plant electrical power, per unit and/or total, at representative operating points)
+Why needed: Central to computing actual COP (kW/ton) and to quantify energy savings potential from operational changes.
+Thermodynamics: Baseline energy use at different loads defines headroom for improvements and distinguishes genuine COP improvements from static performance.
+Load (Chiller plant cooling load or tonnage delivered, or per-chiller load if available)
+Why needed: Required to compute loading, staging efficiency, and to identify under/over-sizing or poor part-load performance.
+ASHRAE/DOE context: Savings potential is highly load-dependent; knowing actual delivered load is essential to estimate potential 7%+ gains from controls and sequencing.
+Flow (Water flow rate in CHW and, if relevant, CDW circuit)
+Why needed (critical): Determines actual heat transfer effectiveness, verifies ΔT readings are physically plausible, and distinguishes flow-restriction or fouling from mere low load.
+Physics/ASHRAE: Flow rate is a major factor in pump energy, ΔT across coils, and overall plant COP. Absence of flow data is a known source of ambiguity between “low-load/efficiency opportunity” vs. “flow restriction/mechanical issue.”
+Optional (but strongly recommended as verification if available)
+8) Outdoor ambient data (dry-bulb, wet-bulb, solar radiation) and occupancy/internal loads
+Why: Enables weather-driven reset analysis and seasonality assessment, which are central to control optimization strategies.
+Chiller/ST (Unit-level operating mode, part-load ratio, staging sequence, and chiller on/off state)
+Why: Critical to attribute observed inefficiencies to control logic vs. mechanical faults; supports proper attribution of savings potential to controls and staging rather than hardware limits.
+Delta-T across major heat transfer loops (e.g., ΔT across CHW and CDW coils)
+Why: Direct indicator of heat transfer effectiveness and fouling/flow issues; helps validate whether an energy-saving strategy would be physics-limited or controllable via operational changes.
+How these data items map to the Baseline Hypothesis testing
+If CHWST, CHWRT, CDWST, CDWRT, Power, Flow, and Load are all available with consistent time alignment:
+You can compute true COP across operating envelopes, identify mis-staged sequencing, quantify potential gains from resetting CHWS/CDW and optimizing tower/condenser operations, and distinguish mechanical limitations (e.g., flow restriction, fouling) from controllable inefficiencies.
+A robust quantitative test of the Baseline Hypothesis can be performed by simulating standard efficiency measures (controls optimization, RCx-style tuning, minor setpoint adjustments) and estimating the achievable energy reduction given observed loads and measured ΔT/flow. If the resulting posterior probability for ≥7% savings remains low after accounting for all measured channels, you have stronger evidence in favor of the Baseline Hypothesis; if it rises, you have evidence against it.
+Operational notes and verification steps
+Ensure data provenance: timestamp alignment across all channels, units consistency (kW vs. MW, °C, L/s or GPM, etc.).
+Validate measurement integrity: check for sensor drift, calibration status, and any negative readings (as you flagged earlier). Document any known data quality gaps.
+Check for missing or inconsistent data windows (e.g., nighttime periods with zero or near-zero flow that could distort the analysis).
+Provide a concise data quality score (e.g., percentage of records with valid flow, valid temperatures, and power readings) to accompany the Bare Data set.
+Minimal reporting format for decision-ready use
+A compact data summary showing for each metric: current average, 95th percentile, minimum, maximum, and a statement of data quality (valid/missing/calibrated).
+A single combined COP curve across representative loads, with and without suggested control optimizations, explicitly showing estimated energy savings for ≥7% target under realistic constraints.
+Clear caveats where data gaps exist (especially missing flow) and the corresponding impact on the confidence level for rejecting the Baseline Hypothesis.
+If you want, I can create a minimal, checkable data template (CSV or JSON) containing exactly these fields, with placeholders for a few representative operating points, and a short calculation script to compute COP, headroom, and a preliminary 7% savings estimate.
