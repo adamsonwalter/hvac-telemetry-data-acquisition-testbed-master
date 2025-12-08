@@ -1,5 +1,5 @@
 {
   "status": "ERROR",
-  "error": "use_stage1_verifier() got an unexpected keyword argument 'timestamp_col'",
-  "timestamp": "2025-12-08T11:43:31.529912"
+  "error": "Stage 1 HALT: CHWST has 2.3% samples outside valid range (3.0-20.0\u00b0C); CHWRT < CHWST in 54.7% of samples (violates physics: return temp must be \u2265 supply temp); CDWRT \u2264 CHWST in 2.1% of samples (violates physics: condenser return must be > chilled water supply)",
+  "timestamp": "2025-12-08T12:14:49.869924"
 }
