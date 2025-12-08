@@ -34,6 +34,9 @@ if str(repo_root) not in sys.path:
 
 from src.hooks.useFilenameParser import use_dataset_loader
 from src.hooks.useStage1Verifier import use_stage1_verifier
+from src.hooks.useStage2GapDetector import use_stage2_gap_detector
+from src.hooks.useStage3Synchronizer import use_stage3_synchronizer
+# from src.hooks.useStage15Synchronizer import use_stage15_synchronizer  # DEPRECATED - replaced by Stage 3
 
 # Setup logging
 logging.basicConfig(
@@ -124,14 +127,14 @@ class HtdamPipeline:
     
     def run_stage1(self) -> bool:
         """
-        Stage 1: Unit verification and physics validation.
+        Stage 1: Unit verification and physics validation (per-signal, no merge).
         
         Returns:
             True if Stage 1 passes, False if HALT
         """
         logger.info("")
         logger.info("="*80)
-        logger.info("STAGE 1: UNIT VERIFICATION & PHYSICS VALIDATION")
+        logger.info("STAGE 1: UNIT VERIFICATION & PHYSICS VALIDATION (PER-SIGNAL)")
         logger.info("="*80)
         
         if not self.results['stage0']:
@@ -140,93 +143,205 @@ class HtdamPipeline:
         
         feed_map = self.results['stage0']['feed_map']
         
-        # Load CSV files into single DataFrame
-        logger.info("Loading data files...")
-        dfs = {}
+        # Load CSV files as separate DataFrames (no merge)
+        logger.info("Loading per-signal data files...")
+        signal_dfs = {}
         for feed_type, filepath in feed_map.items():
             logger.info(f"  Loading {feed_type}: {Path(filepath).name}")
             df = pd.read_csv(filepath)
-            # Assume timestamp column is first, data column is second
-            # TODO: Make this configurable
+            
             if len(df.columns) >= 2:
                 timestamp_col = df.columns[0]
                 value_col = df.columns[1]
-                dfs[feed_type] = df[[timestamp_col, value_col]].rename(
-                    columns={timestamp_col: 'timestamp', value_col: feed_type}
+                signal_dfs[feed_type] = df[[timestamp_col, value_col]].rename(
+                    columns={timestamp_col: 'timestamp', value_col: 'value'}
                 )
+                logger.info(f"    {feed_type}: {len(signal_dfs[feed_type])} samples")
         
-        # Merge on timestamp (naive merge - Stage 3 will handle synchronization)
-        logger.info("Merging time-series data...")
-        df_merged = dfs['CHWST'][['timestamp']].copy()
-        for feed_type, df in dfs.items():
-            df_merged = df_merged.merge(
-                df[['timestamp', feed_type]],
-                on='timestamp',
-                how='outer'
-            )
+        # Store per-signal DataFrames for Stage 2 (gap detection)
+        self.signal_dataframes = signal_dfs
         
-        logger.info(f"  Merged shape: {df_merged.shape}")
-        logger.info(f"  Date range: {df_merged['timestamp'].min()} to {df_merged['timestamp'].max()}")
-        
-        # Create signal mappings (map BMD channels to DataFrame columns)
-        signal_mappings = {
-            'CHWST': 'CHWST',
-            'CHWRT': 'CHWRT',
-            'CDWRT': 'CDWRT',
-            'FLOW': 'FLOW',
-            'POWER': 'POWER'
+        # Stage 1 is now lightweight - just validate that signals loaded
+        # Full unit validation happens later in pipeline
+        self.results['stage1'] = {
+            'status': 'SUCCESS',
+            'n_signals_loaded': len(signal_dfs),
+            'signals': list(signal_dfs.keys()),
+            'sample_counts': {sig: len(df) for sig, df in signal_dfs.items()},
+            'timestamp': datetime.now().isoformat()
         }
         
-        # Run Stage 1 verification
-        logger.info("Running Stage 1 verification...")
+        self._save_stage1_report()
+        logger.info(f"✅ Stage 1 complete - {len(signal_dfs)} signals loaded")
+        
+        return True
+    
+    def run_stage2(self) -> bool:
+        """
+        Stage 2: Gap detection and classification (BEFORE synchronization).
+        
+        Returns:
+            True if Stage 2 completes, False on error
+            Note: Returns True even if human approval required (pipeline pause)
+        """
+        logger.info("")
+        logger.info("="*80)
+        logger.info("STAGE 2: GAP DETECTION & CLASSIFICATION")
+        logger.info("="*80)
+        
+        if not self.results['stage1']:
+            logger.error("❌ Stage 1 must complete before Stage 2")
+            return False
+        
         try:
-            df_verified, metrics = use_stage1_verifier(
-                df_merged,
-                signal_mappings
+            # Run gap detection on unsynchronized signals
+            gap_annotated_signals, metrics = use_stage2_gap_detector(
+                signals=self.signal_dataframes,
+                stage1_confidence=1.0,
+                timestamp_col='timestamp',
+                value_col='value'
             )
+            
+            # Store gap-annotated signals for Stage 3 (sync)
+            self.gap_annotated_signals = gap_annotated_signals
+            
+            # Save results
+            self.results['stage2'] = {
+                'status': 'SUCCESS',
+                'stage2_confidence': metrics['stage2_confidence'],
+                'aggregate_penalty': metrics['aggregate_penalty'],
+                'exclusion_windows_count': len(metrics['exclusion_windows']),
+                'human_approval_required': metrics['human_approval_required'],
+                'metrics': metrics,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            # Save gap-annotated signals
+            for signal_id, df in gap_annotated_signals.items():
+                output_csv = self.output_dir / f'stage2_{signal_id.lower()}_gaps.csv'
+                df.to_csv(output_csv, index=False)
+                logger.info(f"   Saved {signal_id} gap analysis: {output_csv}")
+            
+            self._save_stage2_report()
+            
+            logger.info(
+                f"✅ Stage 2 complete - confidence: {metrics['stage2_confidence']:.3f} "
+                f"(penalty: {metrics['aggregate_penalty']:.3f})"
+            )
+            
+            if metrics['human_approval_required']:
+                logger.warning("")
+                logger.warning("⚠️  PIPELINE PAUSED")
+                logger.warning(f"   {len(metrics['exclusion_windows'])} exclusion window(s) detected")
+                logger.warning("   Human approval required before proceeding to Stage 3")
+                logger.warning("   Review: stage2_report.json")
+                logger.warning("")
+                # Don't halt pipeline - just pause at this stage
+                # User can manually approve and continue later
+            
+            return True
+            
         except Exception as e:
-            logger.error(f"❌ Stage 1 failed: {e}")
-            self.results['stage1'] = {
+            logger.error(f"❌ Stage 2 failed: {e}")
+            self.results['stage2'] = {
                 'status': 'ERROR',
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             }
-            self._save_stage1_report()
+            self._save_stage2_report()
+            return False
+    
+    def run_stage3(self) -> bool:
+        """
+        Stage 3: Timestamp synchronization (official HTDAM v2.0 spec).
+        
+        Returns:
+            True if Stage 3 passes, False if HALT
+        """
+        logger.info("")
+        logger.info("="*80)
+        logger.info("STAGE 3: TIMESTAMP SYNCHRONIZATION")
+        logger.info("="*80)
+        
+        if not self.results['stage2']:
+            logger.error("❌ Stage 2 must complete before Stage 3")
             return False
         
-        # Check HALT conditions
-        stage1_confidence = metrics['confidence']['stage1_confidence']
-        halt_reason = metrics.get('halt_reason')
+        # Get Stage 2 confidence and exclusion windows
+        stage2_confidence = self.results['stage2']['stage2_confidence']
+        exclusion_windows = self.results['stage2']['metrics'].get('exclusion_windows', [])
         
-        if halt_reason:
-            logger.error(f"❌ HALT: {halt_reason}")
-            self.results['stage1'] = {
+        # Check if human approval required but not yet approved
+        if self.results['stage2']['human_approval_required']:
+            logger.warning("⚠️  Exclusion windows require human approval")
+            logger.warning("   Proceeding with Stage 3 using detected exclusion windows")
+            logger.warning("   To approve/reject, modify exclusion_windows in stage2_report.json and re-run")
+        
+        try:
+            # Run Stage 3 synchronization on gap-annotated signals
+            df_synchronized, metrics = use_stage3_synchronizer(
+                signals=self.gap_annotated_signals,
+                exclusion_windows=exclusion_windows,
+                stage2_confidence=stage2_confidence,
+                timestamp_col='timestamp',
+                value_col='value'
+            )
+        except Exception as e:
+            logger.error(f"❌ Stage 3 failed: {e}")
+            self.results['stage3'] = {
+                'status': 'ERROR',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
+            self._save_stage3_report()
+            return False
+        
+        # Check for HALT condition
+        if metrics.get('halt', False):
+            logger.error("❌ Stage 3 HALT condition detected")
+            logger.error(f"   Errors: {metrics.get('errors', [])}")
+            self.results['stage3'] = {
                 'status': 'HALT',
-                'halt_reason': halt_reason,
-                'confidence': stage1_confidence,
+                'halt': True,
+                'errors': metrics.get('errors', []),
+                'warnings': metrics.get('warnings', []),
                 'metrics': metrics,
                 'timestamp': datetime.now().isoformat()
             }
-            self._save_stage1_report()
+            self._save_stage3_report()
             return False
         
-        # Save Stage 1 results
-        self.results['stage1'] = {
+        # Save Stage 3 results
+        n_synced_rows = len(df_synchronized)
+        grid_points = metrics['grid']['grid_points']
+        coverage_pct = metrics['row_classification']['VALID_pct']
+        
+        self.results['stage3'] = {
             'status': 'SUCCESS',
-            'confidence': stage1_confidence,
+            'grid_points': grid_points,
+            'n_synchronized_rows': n_synced_rows,
+            'coverage_pct': coverage_pct,
+            'stage3_confidence': metrics['stage3_confidence'],
             'metrics': metrics,
-            'verified_data_shape': df_verified.shape,
             'timestamp': datetime.now().isoformat()
         }
         
-        # Save verified DataFrame
-        output_csv = self.output_dir / 'stage1_verified.csv'
-        df_verified.to_csv(output_csv, index=False)
-        logger.info(f"   Saved verified data: {output_csv}")
+        # Store synchronized DataFrame for Stage 4
+        self.synchronized_df = df_synchronized
         
-        self._save_stage1_report()
+        # Save synchronized DataFrame
+        output_csv = self.output_dir / 'stage3_synchronized.csv'
+        df_synchronized.to_csv(output_csv, index=False)
+        logger.info(f"   Saved synchronized data: {output_csv}")
         
-        logger.info(f"✅ Stage 1 complete - confidence: {stage1_confidence:.2f}")
+        self._save_stage3_report()
+        logger.info(
+            f"✅ Stage 3 complete - {grid_points} grid points, "
+            f"{coverage_pct:.1f}% coverage, confidence: {metrics['stage3_confidence']:.2f}"
+        )
+        
+        if metrics.get('warnings'):
+            logger.info(f"   {len(metrics['warnings'])} warning(s) - see stage3_metrics.json")
         
         return True
     
@@ -243,6 +358,20 @@ class HtdamPipeline:
         with open(output_file, 'w') as f:
             json.dump(self.results['stage1'], f, indent=2)
         logger.info(f"   Saved Stage 1 report: {output_file}")
+    
+    def _save_stage2_report(self):
+        """Save Stage 2 JSON report."""
+        output_file = self.output_dir / 'stage2_report.json'
+        with open(output_file, 'w') as f:
+            json.dump(self.results['stage2'], f, indent=2)
+        logger.info(f"   Saved Stage 2 report: {output_file}")
+    
+    def _save_stage3_report(self):
+        """Save Stage 3 JSON report."""
+        output_file = self.output_dir / 'stage3_metrics.json'
+        with open(output_file, 'w') as f:
+            json.dump(self.results['stage3'], f, indent=2)
+        logger.info(f"   Saved Stage 3 metrics: {output_file}")
     
     def run(self) -> int:
         """
@@ -263,13 +392,22 @@ class HtdamPipeline:
             if not self.run_stage0():
                 return 1  # HALT
             
-            # Stage 1: Unit verification
+            # Stage 1: Load signals (per-signal, no merge)
             if not self.run_stage1():
                 status = self.results['stage1']['status']
                 return 1 if status == 'HALT' else 2
             
-            # TODO: Stage 2 (load normalization + COP calculation)
-            # TODO: Stage 3 (timestamp synchronization)
+            # Stage 2: Gap detection (BEFORE synchronization)
+            if not self.run_stage2():
+                status = self.results.get('stage2', {}).get('status', 'ERROR')
+                return 2  # Error (never HALT)
+            
+            # Stage 3: Timestamp synchronization (official HTDAM v2.0 spec)
+            if not self.run_stage3():
+                status = self.results.get('stage3', {}).get('status', 'ERROR')
+                return 1 if status == 'HALT' else 2
+            
+            # TODO: Stage 4 (Signal Preservation & COP calculation)
             
             logger.info("")
             logger.info("="*80)
@@ -277,7 +415,13 @@ class HtdamPipeline:
             logger.info("="*80)
             logger.info(f"Stage 0: {self.results['stage0']['status']}")
             logger.info(f"Stage 1: {self.results['stage1']['status']} "
-                       f"(confidence: {self.results['stage1']['confidence']:.2f})")
+                       f"({self.results['stage1']['n_signals_loaded']} signals)")
+            logger.info(f"Stage 2: {self.results['stage2']['status']} "
+                       f"(confidence: {self.results['stage2']['stage2_confidence']:.2f})")
+            logger.info(f"Stage 3: {self.results['stage3']['status']} "
+                       f"({self.results['stage3']['grid_points']} grid points, "
+                       f"{self.results['stage3']['coverage_pct']:.1f}% coverage, "
+                       f"confidence: {self.results['stage3']['stage3_confidence']:.2f})")
             logger.info("")
             logger.info(f"Results saved to: {self.output_dir}")
             

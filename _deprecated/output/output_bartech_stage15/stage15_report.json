@@ -1,0 +1,65 @@
+{
+  "status": "SUCCESS",
+  "n_synchronized_rows": 33991,
+  "sync_quality": "good",
+  "metrics": {
+    "stage": "SYNC",
+    "n_input_signals": 5,
+    "n_required_signals": 2,
+    "n_common_timestamps": 35095,
+    "n_synchronized_rows": 33991,
+    "synchronization_metrics": {
+      "n_common_timestamps": 35095,
+      "per_signal_coverage": {
+        "CHWST": 98.65,
+        "CHWRT": 98.5,
+        "CDWRT": 99.47,
+        "POWER": 7.3,
+        "FLOW": 35.73
+      },
+      "overall_data_retention": 25.6,
+      "sync_quality": "good"
+    },
+    "signal_coverage": {
+      "CHWST": {
+        "total_rows": 33991,
+        "non_null_rows": 33991,
+        "null_rows": 0,
+        "coverage_pct": 100.0
+      },
+      "CHWRT": {
+        "total_rows": 33991,
+        "non_null_rows": 33991,
+        "null_rows": 0,
+        "coverage_pct": 100.0
+      },
+      "CDWRT": {
+        "total_rows": 33991,
+        "non_null_rows": 33991,
+        "null_rows": 0,
+        "coverage_pct": 100.0
+      },
+      "POWER": {
+        "total_rows": 33991,
+        "non_null_rows": 33991,
+        "null_rows": 0,
+        "coverage_pct": 100.0
+      },
+      "FLOW": {
+        "total_rows": 33991,
+        "non_null_rows": 33991,
+        "null_rows": 0,
+        "coverage_pct": 100.0
+      }
+    },
+    "validation": {
+      "valid": true,
+      "n_rows": 33991,
+      "violations": [],
+      "warnings": []
+    },
+    "warnings": [],
+    "errors": []
+  },
+  "timestamp": "2025-12-08T14:34:38.748249"
+}

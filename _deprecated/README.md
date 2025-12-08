@@ -66,6 +66,61 @@ python -m src.orchestration.DecoderCLI pump.csv
 - **Deprecation Date**: 2025-12-03
 - **Removal Date**: TBD (will keep for reference during transition)
 
+---
+
+## Stage 1.5 → Stage 3 Migration
+
+**Date Deprecated**: 2024-12-08  
+**Reason**: Official HTDAM v2.0 Stage 3 specification supersedes experimental Stage 1.5
+
+### Stage 1.5 (Deprecated)
+- Experimental timestamp synchronization
+- Simple timestamp merging
+- Basic alignment logic
+- Limited quality metrics
+
+### Stage 3 (Current)
+- Official HTDAM v2.0 specification
+- O(N+M) nearest-neighbor alignment
+- NO interpolation (preserves real measurements)
+- Quality tiers: EXACT/CLOSE/INTERP/MISSING
+- Row-level confidence scoring
+- Exclusion window support
+- Coverage-based penalties
+
+### Deprecated Stage 1.5 Files
+- `src/domain/htdam/stage15/` → Domain functions
+- `src/hooks/useStage15Synchronizer.py` → Orchestration hook
+- `tests/domain/htdam/stage15/` → Unit tests
+- `docs/STAGE15_SYNCHRONIZATION.md` → Documentation
+- `output/output_bartech_stage15/` → Old test outputs
+
+### Current Stage 3 Files
+- `src/domain/htdam/stage3/` → 8 pure domain functions (886 lines)
+- `src/hooks/useStage3Synchronizer.py` → Orchestration hook (522 lines)
+- `tests/domain/htdam/stage3/` → Test suite (75 tests)
+- `docs/STAGE3_SYNCHRONIZATION.md` → Complete docs (540 lines)
+- `docs/STAGE3_QUICKSTART.md` → Quick reference
+
+### Migration Example
+```python
+# OLD (Stage 1.5)
+from src.hooks.useStage15Synchronizer import use_stage15_synchronizer
+df_sync = use_stage15_synchronizer(signals)
+
+# NEW (Stage 3)
+from src.hooks.useStage3Synchronizer import use_stage3_synchronizer
+df_sync, metrics, halt = use_stage3_synchronizer(
+    gap_annotated_signals=stage2_signals,
+    exclusion_windows=windows,
+    stage2_confidence=0.93
+)
+```
+
+**Do NOT use Stage 1.5 code in production.** Always use Stage 3.
+
+---
+
 ## Questions?
 
 See `WARP_ARCHITECTURE_RULE.md` for complete documentation.

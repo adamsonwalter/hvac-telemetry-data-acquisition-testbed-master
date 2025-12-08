@@ -1,0 +1,108 @@
+{
+  "status": "SUCCESS",
+  "confidence": 0.5,
+  "metrics": {
+    "stage": "UNITS",
+    "total_records": 10624,
+    "unit_conversions": {
+      "CHWST": {
+        "from_unit": "C",
+        "to_unit": "C",
+        "conversion_applied": false,
+        "detection_confidence": 0.8
+      },
+      "CHWRT": {
+        "from_unit": "C",
+        "to_unit": "C",
+        "conversion_applied": false,
+        "detection_confidence": 0.8
+      },
+      "CDWRT": {
+        "from_unit": "C",
+        "to_unit": "C",
+        "conversion_applied": false,
+        "detection_confidence": 0.8
+      },
+      "FLOW": {
+        "from_unit": "L/s",
+        "to_unit": "m3/s",
+        "conversion_applied": true,
+        "detection_confidence": 0.8
+      },
+      "POWER": {
+        "from_unit": "kW",
+        "to_unit": "kW",
+        "conversion_applied": false,
+        "detection_confidence": 0.6
+      }
+    },
+    "physics_violations": {
+      "temperature_ranges": {
+        "CHWST": {
+          "violations_count": 3,
+          "violations_pct": 0.028237951807228913,
+          "valid_min": 3.0,
+          "valid_max": 20.0,
+          "actual_min": 5.83,
+          "actual_max": 20.89
+        },
+        "CHWRT": {
+          "violations_count": 0,
+          "violations_pct": 0.0,
+          "valid_min": 5.0,
+          "valid_max": 30.0,
+          "actual_min": 7.5,
+          "actual_max": 22.39
+        },
+        "CDWRT": {
+          "violations_count": 0,
+          "violations_pct": 0.0,
+          "valid_min": 15.0,
+          "valid_max": 45.0,
+          "actual_min": 17.61,
+          "actual_max": 31.28
+        }
+      },
+      "temperature_relationships": {
+        "chwrt_lt_chwst_count": 0,
+        "chwrt_lt_chwst_pct": 0.0,
+        "cdwrt_lte_chwst_count": 0,
+        "cdwrt_lte_chwst_pct": 0.0
+      },
+      "non_negative": {
+        "FLOW": {
+          "negative_count": 0,
+          "negative_pct": 0.0,
+          "actual_min": 0.0002
+        },
+        "POWER": {
+          "negative_count": 0,
+          "negative_pct": 0.0,
+          "actual_min": 0.0
+        }
+      }
+    },
+    "confidence_scores": {
+      "CHWST": 0.7,
+      "CHWRT": 0.7,
+      "CDWRT": 0.7,
+      "FLOW": 0.7,
+      "POWER": 0.5,
+      "overall": 0.5
+    },
+    "penalty": -0.05,
+    "final_score": 0.45,
+    "warnings": [
+      "CHWST: 0.03% of samples outside valid range (3.0-20.0\u00b0C)",
+      "Filtered to ACTIVE state due to suspected standby reversal"
+    ],
+    "errors": [],
+    "halt": false,
+    "salvage": true
+  },
+  "verified_data_shape": [
+    10624,
+    39
+  ],
+  "timestamp": "2025-12-08T14:18:36.409071"
+}

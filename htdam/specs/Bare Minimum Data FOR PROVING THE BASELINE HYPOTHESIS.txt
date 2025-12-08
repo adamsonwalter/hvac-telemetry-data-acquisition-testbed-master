@@ -247,5 +247,121 @@ Assessment Level | Data Required | Can Reject H₀? | Confidence | Use Case |
 | **Definitive** | Extended + flow metering + vibration + oil health | Yes | 90%+ | Pre-retrofit engineering |
 
 ═════════════════════════════════════════════════════════════════════════════
+
+SECTION H: FUTURE ENHANCEMENTS & TECHNICAL POSITIONING
+═════════════════════════════════════════════════════════════════════════════
+
+**H.1: Product Positioning Clarity**
+
+Current documentation conflates two distinct deliverables:
+- Energy Efficiency Report (quantitative COP analysis)
+- Health Check (qualitative + quantitative condition assessment)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Data Component Necessity Matrix                                         │
+├──────────────────────────┬────────────────┬────────────────┬────────────┤
+│ MVD Section              │ COP / Efficien │ Health Check   │ Analysis   │
+├──────────────────────────┼────────────────┼────────────────┼────────────┤
+│ Energy & Temps           │ YES (required) │ YES (required) │ COP calc   │
+│ Zone Temps               │ NO             │ YES (critical) │ Occupant   │
+│ Alarms (Fault Logs)      │ NO             │ YES (critical) │ Maint risk │
+│ Maintenance Logs         │ NO             │ Partial (opt)  │ De-bias    │
+└──────────────────────────┴────────────────┴────────────────┴────────────┘
+
+**Recommendation:**
+- Maintain two product tiers:
+  1. "COP Efficiency Report" (BMD/core data only)
+  2. "System Health Check" (MVD - includes zones, alarms, logs)
+- Frame maintenance logs as "Optional/Bonus" to reduce friction
+
+**H.2: Technical Communication - Disarming "Deal Killers"**
+
+**Issue 1: Lift Calculation Precision**
+
+Current BMD claims to calculate "Lift" using CDWRT (entering condenser).
+
+Technician objection:
+"Lift is refrigerant pressure difference. CDWRT is tower water temp. You don't
+know if condenser tubes are fouled, so you don't know actual head pressure."
+
+**Fix:** Clarify terminology
+- "External Lift Potential" (environment-side) - uses CDWRT
+- "Internal Refrigerant Lift" (compressor-side) - requires CDWST + approach
+
+**Recommended Script:**
+"We calculate External Lift Potential using tower water temperature. This shows
+what the environment offers. Deviation from expected COP at this lift indicates
+control issues, fouling, or mechanical constraints - which is exactly what we
+quantify."
+
+**Issue 2: Accuracy Claims**
+
+Claiming "98% accuracy" on uncalibrated BMS sensors undermines credibility.
+(1°C error in CHW Delta-T = 10-20% load calculation error)
+
+Technician reaction: "Marketing fluff."
+
+**Fix:** Reframe language
+- Replace: "98% accuracy on savings"
+- With: "High-Confidence Feasibility Assessment"
+
+**Recommended Script:**
+"We don't claim ARI-standard COP accuracy with 5 points. We run thermodynamic
+sensitivity analysis. We look at how chiller kW responds to CDWRT changes. If
+the chiller ignores water temp relief, it's optimizable. We don't need perfect
+data to see the pattern of inefficiency, only to measure the magnitude."
+
+**This framing:**
+✓ Admits data limitations (builds technician trust)
+✓ Validates statistical method (preserves technical credibility)
+✓ Focuses on responsiveness patterns vs absolute accuracy
+
+**H.3: Critical Gap - CDWST Addition**
+
+Current MVD requests CDWRT but not CDWST (leaving condenser / entering tower).
+
+**Impact:**
+- Cannot calculate tower Range: CDWST - CDWRT
+- Cannot verify tower Approach: CDWRT - Wet Bulb
+- Cannot assess tower performance to design
+
+**Resolution:**
+Section B already addresses this - CDWST is in Extended Dataset (7-parameter set)
+
+**H.4: Training Deck Update (Slide 13/14 Script)**
+
+For technical stakeholder presentations:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ "We are not trying to calculate an ARI-standard COP with just 5 points. │
+│  We are running a thermodynamic sensitivity analysis. We look at how    │
+│  the Chiller kW moves when the CDWRT changes. If the chiller ignores   │
+│  the water temp relief, we know it's optimizable. We don't need perfect │
+│  data to see the pattern of inefficiency, only to measure magnitude."   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+**Key Messaging:**
+- Physics-based pattern detection (not absolute measurement)
+- Statistical sensitivity analysis (not single-point accuracy)
+- Optimization opportunity identification (not equipment certification)
+
+**H.5: Implementation Priority**
+
+**Near-term (< 6 months):**
+1. Update client-facing docs to separate COP Report vs Health Check
+2. Revise accuracy claims to "High-Confidence Feasibility"
+3. Add lift calculation clarification (External vs Internal)
+4. Update training deck with technician-friendly script
+
+**Medium-term (6-12 months):**
+5. Develop "Health Check" tier with zones/alarms
+6. Make maintenance logs optional/bonus field
+7. Add CDWST to standard MVD request (already in 7-param Extended)
+
+**Long-term (> 12 months):**
+8. Integrate derating confidence methodology into MVD workflows
+9. Develop case studies showing pattern detection success with imperfect data
+
+═════════════════════════════════════════════════════════════════════════════
 END OF DOCUMENT
 ═════════════════════════════════════════════════════════════════════════════

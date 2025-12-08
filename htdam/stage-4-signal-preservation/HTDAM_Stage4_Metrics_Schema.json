@@ -1,0 +1,466 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HTDAM Stage 4 Metrics Schema",
+  "description": "Validates metrics JSON output from Stage 4: Signal Preservation & COP Calculation",
+  "type": "object",
+  "required": [
+    "stage",
+    "timestamp_start",
+    "timestamp_end",
+    "total_rows",
+    "load_analysis",
+    "cop_analysis",
+    "hunt_analysis",
+    "fouling_analysis",
+    "overall_statistics",
+    "stage4_confidence",
+    "halt"
+  ],
+  "properties": {
+    "stage": {
+      "type": "string",
+      "enum": ["SPOC"],
+      "description": "Stage identifier: Signal Preservation & COP"
+    },
+    "timestamp_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "First grid timestamp (ISO 8601)"
+    },
+    "timestamp_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last grid timestamp (ISO 8601)"
+    },
+    "total_rows": {
+      "type": "integer",
+      "minimum": 1000,
+      "description": "Total rows in synchronized grid"
+    },
+    
+    "load_analysis": {
+      "type": "object",
+      "required": ["q_valid_count", "q_valid_pct", "q_mean_kw", "q_std_kw", "q_confidence_mean"],
+      "properties": {
+        "q_valid_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of valid load calculations"
+        },
+        "q_valid_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of valid load calculations"
+        },
+        "q_mean_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mean cooling load (kW)"
+        },
+        "q_std_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Std dev of cooling load (kW)"
+        },
+        "q_min_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Minimum cooling load observed (kW)"
+        },
+        "q_max_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum cooling load observed (kW)"
+        },
+        "delta_t_mean_c": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mean chilled water ΔT (°C)"
+        },
+        "delta_t_std_c": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Std dev of ΔT (°C)"
+        },
+        "q_confidence_mean": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Mean load confidence across grid"
+        }
+      },
+      "additionalProperties": false
+    },
+    
+    "cop_analysis": {
+      "type": "object",
+      "required": ["cop_valid_count", "cop_valid_pct", "cop_mean", "cop_confidence_mean"],
+      "properties": {
+        "cop_valid_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of valid COP calculations"
+        },
+        "cop_valid_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of valid COP"
+        },
+        "cop_mean": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mean COP (dimensionless)"
+        },
+        "cop_std": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Std dev of COP"
+        },
+        "cop_min": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Minimum COP observed"
+        },
+        "cop_max": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum COP observed"
+        },
+        "cop_normalized_mean": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mean normalized COP (COP / COP_carnot)"
+        },
+        "cop_normalized_median": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Median normalized COP"
+        },
+        "cop_out_of_range_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of COP values outside valid range (2.0–7.0)"
+        },
+        "cop_confidence_mean": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Mean COP confidence across grid"
+        }
+      },
+      "additionalProperties": false
+    },
+    
+    "hunt_analysis": {
+      "type": "object",
+      "required": ["hunt_windows_analyzed", "hunt_detected_windows", "hunt_pct", "hunt_severity_breakdown"],
+      "properties": {
+        "hunt_windows_analyzed": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total 24-hour sliding windows analyzed"
+        },
+        "hunt_detected_windows": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Windows with MINOR or MAJOR hunting detected"
+        },
+        "hunt_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of windows with hunting"
+        },
+        "hunt_severity_breakdown": {
+          "type": "object",
+          "required": ["NONE", "MINOR", "MAJOR"],
+          "properties": {
+            "NONE": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MINOR": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MAJOR": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "hunt_frequency_mean_cycles_per_hour": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mean hunting frequency across all windows (cycles/hour)"
+        },
+        "hunt_confidence_mean": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Mean hunt detection confidence"
+        }
+      },
+      "additionalProperties": false
+    },
+    
+    "fouling_analysis": {
+      "type": "object",
+      "required": [
+        "evaporator_fouling_mean_pct",
+        "condenser_fouling_mean_pct"
+      ],
+      "properties": {
+        "evaporator_fouling_mean_pct": {
+          "type": "number",
+          "minimum": -100,
+          "description": "Mean evaporator fouling percentage (negative = improved, positive = fouled)"
+        },
+        "evaporator_fouling_std_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Std dev of evaporator fouling (%)"
+        },
+        "evaporator_severity_breakdown": {
+          "type": "object",
+          "properties": {
+            "CLEAN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MINOR_FOULING": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MAJOR_FOULING": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "condenser_fouling_mean_pct": {
+          "type": "number",
+          "minimum": -50,
+          "description": "Mean condenser fouling percentage"
+        },
+        "condenser_fouling_std_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Std dev of condenser fouling (%)"
+        },
+        "condenser_severity_breakdown": {
+          "type": "object",
+          "properties": {
+            "CLEAN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MINOR_FOULING": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "MAJOR_FOULING": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "fouling_confidence_mean": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Mean fouling detection confidence (inherently lower)"
+        }
+      },
+      "additionalProperties": false
+    },
+    
+    "power_integration": {
+      "type": "object",
+      "properties": {
+        "power_coverage_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of rows with valid power data"
+        },
+        "missing_power_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of rows with missing power"
+        },
+        "impact": {
+          "type": "string",
+          "description": "Human-readable description of power absence impact"
+        }
+      },
+      "additionalProperties": false
+    },
+    
+    "overall_statistics": {
+      "type": "object",
+      "required": ["component_confidence_mean", "component_confidences"],
+      "properties": {
+        "component_confidence_mean": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Average of all component confidences"
+        },
+        "component_confidences": {
+          "type": "object",
+          "required": ["load", "cop", "hunt", "fouling"],
+          "properties": {
+            "load": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "cop": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "hunt": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "fouling": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    
+    "penalty": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 0,
+      "description": "Total confidence penalty applied (due to power coverage, fouling confidence, etc.)"
+    },
+    
+    "stage4_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Final Stage 4 confidence score (0.78–0.85 typical for BarTech)"
+    },
+    
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Non-critical warnings (e.g., 'Power coverage only 81%', 'Fouling confidence reduced')"
+    },
+    
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Critical errors (e.g., 'No valid Q values computed', 'All power missing')"
+    },
+    
+    "halt": {
+      "type": "boolean",
+      "description": "If true, pipeline should HALT (data too invalid to continue)"
+    }
+  },
+  "additionalProperties": false,
+  
+  "examples": [
+    {
+      "stage": "SPOC",
+      "timestamp_start": "2024-09-18T03:30:00Z",
+      "timestamp_end": "2025-09-19T03:15:00Z",
+      "total_rows": 35136,
+      "load_analysis": {
+        "q_valid_count": 32959,
+        "q_valid_pct": 93.8,
+        "q_mean_kw": 45.2,
+        "q_std_kw": 12.5,
+        "q_min_kw": 0.5,
+        "q_max_kw": 98.3,
+        "delta_t_mean_c": 4.2,
+        "delta_t_std_c": 1.3,
+        "q_confidence_mean": 0.85
+      },
+      "cop_analysis": {
+        "cop_valid_count": 28500,
+        "cop_valid_pct": 81.0,
+        "cop_mean": 4.5,
+        "cop_std": 0.8,
+        "cop_min": 2.1,
+        "cop_max": 6.8,
+        "cop_normalized_mean": 0.42,
+        "cop_normalized_median": 0.40,
+        "cop_out_of_range_count": 500,
+        "cop_confidence_mean": 0.78
+      },
+      "hunt_analysis": {
+        "hunt_windows_analyzed": 366,
+        "hunt_detected_windows": 18,
+        "hunt_pct": 4.9,
+        "hunt_severity_breakdown": {
+          "NONE": 348,
+          "MINOR": 15,
+          "MAJOR": 3
+        },
+        "hunt_frequency_mean_cycles_per_hour": 0.08,
+        "hunt_confidence_mean": 0.70
+      },
+      "fouling_analysis": {
+        "evaporator_fouling_mean_pct": 8.2,
+        "evaporator_fouling_std_pct": 3.5,
+        "evaporator_severity_breakdown": {
+          "CLEAN": 280,
+          "MINOR_FOULING": 80,
+          "MAJOR_FOULING": 6
+        },
+        "condenser_fouling_mean_pct": 12.5,
+        "condenser_fouling_std_pct": 5.2,
+        "condenser_severity_breakdown": {
+          "CLEAN": 250,
+          "MINOR_FOULING": 100,
+          "MAJOR_FOULING": 16
+        },
+        "fouling_confidence_mean": 0.55
+      },
+      "power_integration": {
+        "power_coverage_pct": 81.0,
+        "missing_power_pct": 19.0,
+        "impact": "COP unavailable for 6,636 grid points"
+      },
+      "overall_statistics": {
+        "component_confidence_mean": 0.72,
+        "component_confidences": {
+          "load": 0.85,
+          "cop": 0.78,
+          "hunt": 0.70,
+          "fouling": 0.55
+        }
+      },
+      "penalty": -0.10,
+      "stage4_confidence": 0.78,
+      "warnings": [
+        "Power coverage only 81%; COP unavailable for 19% of grid",
+        "Fouling detection confidence reduced; only 366 days observation"
+      ],
+      "errors": [],
+      "halt": false
+    }
+  ]
+}

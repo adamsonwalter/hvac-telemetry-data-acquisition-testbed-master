@@ -1,0 +1,19 @@
+{
+  "status": "SUCCESS",
+  "n_signals_loaded": 5,
+  "signals": [
+    "CHWST",
+    "CHWRT",
+    "CDWRT",
+    "POWER",
+    "FLOW"
+  ],
+  "sample_counts": {
+    "CHWST": 35574,
+    "CHWRT": 35631,
+    "CDWRT": 35283,
+    "POWER": 480766,
+    "FLOW": 98234
+  },
+  "timestamp": "2025-12-08T14:34:38.709229"
+}

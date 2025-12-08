@@ -18,6 +18,7 @@ from src.domain.htdam.stage1.validatePhysics import validate_all_physics
 from src.domain.htdam.stage1.computeConfidence import compute_all_confidences
 from src.domain.htdam.stage1.buildOutputDataFrame import build_stage1_output_dataframe
 from src.domain.htdam.stage1.buildMetrics import build_stage1_metrics
+from src.domain.htdam.constants import COL_CHWST, COL_CHWRT
 
 # Set up logger (side effect)
 logger = logging.getLogger(__name__)
@@ -212,7 +213,62 @@ def use_stage1_verifier(
         logger.error("❌ HALT CONDITIONS DETECTED:")
         for reason in halt_reasons:
             logger.error(f"  - {reason}")
-        
+
+        # Attempt salvage if CHWRT<CHWST violations are high (likely standby reversal)
+        temp_rel = validations.get("temperature_relationships", {})
+        try_salvage = False
+        if temp_rel:
+            chwrt_lt_pct = float(temp_rel.get("chwrt_lt_chwst_pct", 0.0))
+            try_salvage = chwrt_lt_pct >= 50.0  # strong indicator of swapped signals in standby
+
+        if try_salvage:
+            logger.info("\nAttempting salvage via state-based filtering (ACTIVE-only)...")
+            # Lazy import to keep domain layer independent
+            from src.domain.htdam.stage1.detectOperationalState import detect_operational_state
+            from src.domain.htdam.stage1.filterByState import filter_to_states
+
+            # 1) Detect operational state on converted data
+            op_state = detect_operational_state(df_converted, signal_mappings)
+
+            # 2) Filter to ACTIVE state only
+            df_active = filter_to_states(df_converted, op_state, allowed_states=("ACTIVE",))
+            
+            # Calculate ratio based on valid temperature samples (not total merged rows with NaN)
+            valid_temp_mask = df_converted[COL_CHWST].notna() & df_converted[COL_CHWRT].notna()
+            n_valid_temps = valid_temp_mask.sum()
+            active_ratio = len(df_active) / max(1, n_valid_temps)
+            
+            logger.info(f"  ACTIVE rows: {len(df_active)} / {n_valid_temps} valid temp samples ({active_ratio*100:.1f}%)")
+            logger.info(f"  (Total merged rows: {len(df_converted)}, includes NaN from outer merge)")
+
+            if len(df_active) >= 100 and active_ratio >= 0.10:  # Require >=10% ACTIVE for salvage
+                # 3) Re-run physics validation on ACTIVE-only
+                validations_active = validate_all_physics(df_active, signal_mappings)
+                if not validations_active.get("halt_required", False):
+                    logger.info("  ✓ Salvage succeeded: ACTIVE-only data passes physics validation")
+                    # Recompute confidences using ACTIVE validations
+                    confidences_active = compute_all_confidences(conversions, validations_active)
+                    # Build output from ACTIVE-only
+                    df_output = build_stage1_output_dataframe(
+                        df_active,
+                        signal_mappings,
+                        conversions,
+                        validations_active,
+                        confidences_active,
+                    )
+                    metrics = build_stage1_metrics(df_output, conversions, validations_active, confidences_active)
+                    metrics.setdefault('warnings', []).append('Filtered to ACTIVE state due to suspected standby reversal')
+                    metrics['salvage'] = True
+
+                    logger.info("\n" + "=" * 80)
+                    logger.info("Stage 1 Complete (Salvaged: ACTIVE-only)")
+                    logger.info("=" * 80)
+                    return df_output, metrics
+                else:
+                    logger.warning("  Salvage failed: ACTIVE-only still violates physics")
+            else:
+                logger.warning("  Salvage skipped: insufficient ACTIVE samples or too small ratio")
+
         if halt_on_violation:
             error_msg = "Stage 1 HALT: " + "; ".join(halt_reasons)
             logger.error(f"\nRaising exception: {error_msg}")
