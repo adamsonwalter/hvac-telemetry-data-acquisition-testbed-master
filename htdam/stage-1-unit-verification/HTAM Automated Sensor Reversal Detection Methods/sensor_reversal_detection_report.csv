@@ -1,0 +1,9 @@
+Detection_Method,Test_Type,Result,Confidence,Evidence
+1. Statistical,Mean Comparison,PASS (CHWST < CHWRT),Low,Overall means suggest correct labels
+2. Physical Constraints,Violation Rate,FAIL (55% violations),High,Massive violation rate indicates issue
+3. Delta-T Distribution,Distribution Shape,"MIXED (mean OK, median negative)",Medium,Conflicting signals suggest complexity
+4. Cross-Correlation,Temporal Lag,INCONCLUSIVE (no lag),Low,15min sampling too slow for lag detection
+5. Percentile Analysis,Relationship Across Range,FAIL (only 43% correct),High,Strong evidence of reversal issue
+6. State-Dependent,Violation by State,CRITICAL: 77% vs 6%,Very High,State-dependent reversal confirmed
+7. Bi-modal Detection,Distribution Modes,POSITIVE (coeff=0.610),Very High,Two distinct operational modes detected
+8. Temporal Transitions,Mode Switching,HIGH (2935 transitions),Very High,Frequent state changes (every ~12 samples)

@@ -1,0 +1,361 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HTDAM Stage 3 Metrics Output",
+  "description": "JSON schema for Stage 3 (Timestamp Synchronization) metrics output",
+  "type": "object",
+  "required": [
+    "stage",
+    "timestamp_start",
+    "timestamp_end",
+    "grid",
+    "per_stream_alignment",
+    "row_classification",
+    "jitter",
+    "penalties",
+    "stage3_confidence",
+    "warnings",
+    "errors",
+    "halt"
+  ],
+  "properties": {
+    "stage": {
+      "type": "string",
+      "enum": ["SYNC"],
+      "description": "Stage identifier"
+    },
+    "timestamp_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 start timestamp (ceiled to grid)"
+    },
+    "timestamp_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 end timestamp"
+    },
+    "grid": {
+      "type": "object",
+      "required": ["t_nominal_seconds", "grid_points", "coverage_seconds"],
+      "properties": {
+        "t_nominal_seconds": {
+          "type": "integer",
+          "description": "Grid step size in seconds (usually 900)",
+          "minimum": 1
+        },
+        "grid_points": {
+          "type": "integer",
+          "description": "Total number of grid timestamps generated",
+          "minimum": 1
+        },
+        "coverage_seconds": {
+          "type": "number",
+          "description": "Total duration from start to end (seconds)"
+        }
+      }
+    },
+    "per_stream_alignment": {
+      "type": "object",
+      "description": "Alignment metrics for each stream (CHWST, CHWRT, CDWRT, Flow, Power)",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Metrics for streams with data",
+            "required": [
+              "total_raw_records",
+              "aligned_exact_count",
+              "aligned_close_count",
+              "aligned_interp_count",
+              "missing_count",
+              "exact_pct",
+              "close_pct",
+              "interp_pct",
+              "missing_pct",
+              "mean_align_distance_s",
+              "max_align_distance_s"
+            ],
+            "properties": {
+              "total_raw_records": {
+                "type": "integer",
+                "description": "Total raw data points in input stream"
+              },
+              "aligned_exact_count": {
+                "type": "integer",
+                "description": "Grid points with EXACT alignment (<60 s)"
+              },
+              "aligned_close_count": {
+                "type": "integer",
+                "description": "Grid points with CLOSE alignment (60–300 s)"
+              },
+              "aligned_interp_count": {
+                "type": "integer",
+                "description": "Grid points with INTERP alignment (300–1800 s)"
+              },
+              "missing_count": {
+                "type": "integer",
+                "description": "Grid points with no raw data (MISSING)"
+              },
+              "exact_pct": {
+                "type": "number",
+                "description": "Percentage of EXACT alignments"
+              },
+              "close_pct": {
+                "type": "number",
+                "description": "Percentage of CLOSE alignments"
+              },
+              "interp_pct": {
+                "type": "number",
+                "description": "Percentage of INTERP alignments"
+              },
+              "missing_pct": {
+                "type": "number",
+                "description": "Percentage of MISSING alignments"
+              },
+              "mean_align_distance_s": {
+                "type": ["number", "null"],
+                "description": "Mean distance to nearest neighbor (seconds)"
+              },
+              "max_align_distance_s": {
+                "type": ["number", "null"],
+                "description": "Maximum distance to nearest neighbor (seconds)"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["OK", "PARTIAL", "NOT_PROVIDED"],
+                "description": "Stream data availability status"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Metrics for streams with no data (NOT_PROVIDED)",
+            "required": ["status", "missing_pct"],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["NOT_PROVIDED"]
+              },
+              "missing_pct": {
+                "type": "number",
+                "const": 100.0
+              },
+              "impact": {
+                "type": "string",
+                "description": "Description of impact (e.g., COP unavailable)"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "row_classification": {
+      "type": "object",
+      "required": [
+        "VALID_count",
+        "VALID_pct",
+        "COV_CONSTANT_count",
+        "COV_MINOR_count",
+        "SENSOR_ANOMALY_count",
+        "EXCLUDED_count",
+        "GAP_count",
+        "confidence_mean",
+        "confidence_median"
+      ],
+      "properties": {
+        "VALID_count": {
+          "type": "integer",
+          "description": "Number of VALID rows (all mandatory streams present)"
+        },
+        "VALID_pct": {
+          "type": "number",
+          "description": "Percentage of VALID rows"
+        },
+        "COV_CONSTANT_count": {
+          "type": "integer",
+          "description": "Rows marked COV_CONSTANT (stable setpoint)"
+        },
+        "COV_MINOR_count": {
+          "type": "integer",
+          "description": "Rows marked COV_MINOR (minor drift)"
+        },
+        "SENSOR_ANOMALY_count": {
+          "type": "integer",
+          "description": "Rows marked SENSOR_ANOMALY (jump/violation)"
+        },
+        "EXCLUDED_count": {
+          "type": "integer",
+          "description": "Rows inside approved exclusion windows"
+        },
+        "GAP_count": {
+          "type": "integer",
+          "description": "Rows marked as generic GAP"
+        },
+        "confidence_mean": {
+          "type": "number",
+          "description": "Mean row-level confidence score"
+        },
+        "confidence_median": {
+          "type": "number",
+          "description": "Median row-level confidence score"
+        }
+      }
+    },
+    "jitter": {
+      "type": "object",
+      "required": ["interval_mean_s", "interval_std_s", "interval_cv_pct"],
+      "properties": {
+        "interval_mean_s": {
+          "type": "number",
+          "description": "Mean time interval between grid points (should match t_nominal)"
+        },
+        "interval_std_s": {
+          "type": "number",
+          "description": "Standard deviation of intervals"
+        },
+        "interval_cv_pct": {
+          "type": "number",
+          "description": "Coefficient of variation (%)"
+        }
+      }
+    },
+    "penalties": {
+      "type": "object",
+      "required": ["coverage_penalty", "jitter_penalty"],
+      "properties": {
+        "coverage_penalty": {
+          "type": "number",
+          "description": "Penalty for low coverage (0.0, -0.02, -0.05, -0.10)"
+        },
+        "jitter_penalty": {
+          "type": "number",
+          "description": "Penalty for high jitter (-0.02 or 0.0)"
+        }
+      }
+    },
+    "stage3_confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Final Stage 3 confidence = stage2_confidence + penalties"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Non-fatal warnings (e.g., grid too coarse, clock skew detected)"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Fatal errors that prevent processing"
+    },
+    "halt": {
+      "type": "boolean",
+      "description": "True if Stage 3 must HALT (do not proceed to Stage 4)"
+    }
+  },
+  "examples": [
+    {
+      "stage": "SYNC",
+      "timestamp_start": "2024-09-18T03:30:00Z",
+      "timestamp_end": "2025-09-19T03:15:00Z",
+      "grid": {
+        "t_nominal_seconds": 900,
+        "grid_points": 35136,
+        "coverage_seconds": 31622400
+      },
+      "per_stream_alignment": {
+        "CHWST": {
+          "total_raw_records": 35574,
+          "aligned_exact_count": 32959,
+          "aligned_close_count": 70,
+          "aligned_interp_count": 178,
+          "missing_count": 1929,
+          "exact_pct": 93.8,
+          "close_pct": 0.2,
+          "interp_pct": 0.5,
+          "missing_pct": 5.5,
+          "mean_align_distance_s": 22.0,
+          "max_align_distance_s": 835.0,
+          "status": "OK"
+        },
+        "CHWRT": {
+          "total_raw_records": 35574,
+          "aligned_exact_count": 32898,
+          "aligned_close_count": 95,
+          "aligned_interp_count": 198,
+          "missing_count": 1945,
+          "exact_pct": 93.6,
+          "close_pct": 0.3,
+          "interp_pct": 0.6,
+          "missing_pct": 5.5,
+          "mean_align_distance_s": 25.5,
+          "max_align_distance_s": 847.0,
+          "status": "OK"
+        },
+        "CDWRT": {
+          "total_raw_records": 35574,
+          "aligned_exact_count": 32810,
+          "aligned_close_count": 110,
+          "aligned_interp_count": 210,
+          "missing_count": 2006,
+          "exact_pct": 93.4,
+          "close_pct": 0.3,
+          "interp_pct": 0.6,
+          "missing_pct": 5.7,
+          "mean_align_distance_s": 28.0,
+          "max_align_distance_s": 862.0,
+          "status": "OK"
+        },
+        "flow_m3s": {
+          "total_raw_records": 35574,
+          "aligned_exact_count": 32950,
+          "aligned_close_count": 75,
+          "aligned_interp_count": 182,
+          "missing_count": 1929,
+          "exact_pct": 93.8,
+          "close_pct": 0.2,
+          "interp_pct": 0.5,
+          "missing_pct": 5.5,
+          "mean_align_distance_s": 21.5,
+          "max_align_distance_s": 840.0,
+          "status": "OK"
+        },
+        "power_kw": {
+          "status": "PARTIAL",
+          "missing_pct": 12.0,
+          "impact": "COP confidence reduced in Stage 4"
+        }
+      },
+      "row_classification": {
+        "VALID_count": 32959,
+        "VALID_pct": 93.8,
+        "COV_CONSTANT_count": 155,
+        "COV_MINOR_count": 62,
+        "SENSOR_ANOMALY_count": 19,
+        "EXCLUDED_count": 1760,
+        "GAP_count": 181,
+        "confidence_mean": 0.88,
+        "confidence_median": 0.90
+      },
+      "jitter": {
+        "interval_mean_s": 900.0,
+        "interval_std_s": 0.0,
+        "interval_cv_pct": 0.0
+      },
+      "penalties": {
+        "coverage_penalty": -0.05,
+        "jitter_penalty": 0.0
+      },
+      "stage3_confidence": 0.88,
+      "warnings": [
+        "Flow stream: 12% missing; consider coarser grid or longer export period"
+      ],
+      "errors": [],
+      "halt": false
+    }
+  ]
+}

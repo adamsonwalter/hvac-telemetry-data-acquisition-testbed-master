@@ -1,0 +1,10 @@
+Metric,Value
+Total Samples,35095
+Overall Violation Rate,55.4%
+Violation Rate (Active State),5.8%
+Violation Rate (Standby State),76.5%
+State Variance,50.0%
+Bimodality Coefficient,0.610
+Transition Count,2935
+Avg Samples Between Transitions,12.0
+Detection Confidence,95%

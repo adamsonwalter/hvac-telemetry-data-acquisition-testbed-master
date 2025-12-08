@@ -1,0 +1,9 @@
+Rule_Number,Rule_Name,Compliance,Impact_If_Violated
+1,Mandatory Classification,REQUIRED,Undetected data quality issues
+2,Use-Case Filtering,REQUIRED,Invalid analysis results
+3,Quality Score Tagging,REQUIRED,Inability to filter appropriately
+4,Information Content Assessment,RECOMMENDED,Suboptimal data utilization
+5,Temporal Context Preservation,REQUIRED,Loss of operational context
+6,Transitional Data Handling,RECOMMENDED,Startup/shutdown artifacts in analysis
+7,Multi-Equipment Consistency,CONDITIONAL,Cross-equipment analysis failures
+8,Documentation & Provenance,REQUIRED,Non-reproducible results

@@ -1,0 +1,184 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HTDAM Stage 3 Synchronized DataFrame",
+  "description": "CSV/Parquet schema for Stage 3 output dataframe (one row per grid timestamp)",
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Grid timestamp (uniform 15-min intervals, ISO 8601)"
+    },
+    "chwst": {
+      "type": ["number", "null"],
+      "description": "Chilled water supply temperature (°C), aligned to grid or null"
+    },
+    "chwst_align_quality": {
+      "type": "string",
+      "enum": ["EXACT", "CLOSE", "INTERP", "MISSING"],
+      "description": "Alignment quality for CHWST at this grid point"
+    },
+    "chwst_align_distance_s": {
+      "type": ["number", "null"],
+      "description": "Distance to nearest raw CHWST point (seconds), null if MISSING"
+    },
+    "chwrt": {
+      "type": ["number", "null"],
+      "description": "Chilled water return temperature (°C), aligned to grid or null"
+    },
+    "chwrt_align_quality": {
+      "type": "string",
+      "enum": ["EXACT", "CLOSE", "INTERP", "MISSING"],
+      "description": "Alignment quality for CHWRT at this grid point"
+    },
+    "chwrt_align_distance_s": {
+      "type": ["number", "null"],
+      "description": "Distance to nearest raw CHWRT point (seconds), null if MISSING"
+    },
+    "cdwrt": {
+      "type": ["number", "null"],
+      "description": "Condenser water return temperature (°C), aligned to grid or null"
+    },
+    "cdwrt_align_quality": {
+      "type": "string",
+      "enum": ["EXACT", "CLOSE", "INTERP", "MISSING"],
+      "description": "Alignment quality for CDWRT at this grid point"
+    },
+    "cdwrt_align_distance_s": {
+      "type": ["number", "null"],
+      "description": "Distance to nearest raw CDWRT point (seconds), null if MISSING"
+    },
+    "flow_m3s": {
+      "type": ["number", "null"],
+      "description": "CHW flow (m³/s), aligned to grid or null"
+    },
+    "flow_m3s_align_quality": {
+      "type": "string",
+      "enum": ["EXACT", "CLOSE", "INTERP", "MISSING"],
+      "description": "Alignment quality for Flow at this grid point"
+    },
+    "flow_m3s_align_distance_s": {
+      "type": ["number", "null"],
+      "description": "Distance to nearest raw Flow point (seconds), null if MISSING"
+    },
+    "power_kw": {
+      "type": ["number", "null"],
+      "description": "Electrical power input (kW), aligned to grid or null"
+    },
+    "power_kw_align_quality": {
+      "type": "string",
+      "enum": ["EXACT", "CLOSE", "INTERP", "MISSING"],
+      "description": "Alignment quality for Power at this grid point"
+    },
+    "power_kw_align_distance_s": {
+      "type": ["number", "null"],
+      "description": "Distance to nearest raw Power point (seconds), null if MISSING"
+    },
+    "gap_type": {
+      "type": "string",
+      "enum": ["VALID", "COV_CONSTANT", "COV_MINOR", "SENSOR_ANOMALY", "EXCLUDED", "GAP"],
+      "description": "Row-level gap classification from Stage 2 semantics or alignment"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 0.95,
+      "description": "Row-level confidence score based on mandatory stream alignment quality"
+    },
+    "exclusion_window_id": {
+      "type": ["string", "null"],
+      "description": "Exclusion window ID if row is inside approved maintenance window, null otherwise"
+    },
+    "delta_t_c": {
+      "type": ["number", "null"],
+      "description": "Optional derived: chwrt - chwst (temperature differential, °C)"
+    },
+    "lift_c": {
+      "type": ["number", "null"],
+      "description": "Optional derived: cdwrt - chwst (compressor lift, °C)"
+    }
+  },
+  "required": [
+    "timestamp",
+    "chwst",
+    "chwst_align_quality",
+    "chwrt",
+    "chwrt_align_quality",
+    "cdwrt",
+    "cdwrt_align_quality",
+    "gap_type",
+    "confidence"
+  ],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "timestamp": "2024-10-15T14:00:00Z",
+      "chwst": 17.56,
+      "chwst_align_quality": "EXACT",
+      "chwst_align_distance_s": 0.0,
+      "chwrt": 17.39,
+      "chwrt_align_quality": "EXACT",
+      "chwrt_align_distance_s": 2.5,
+      "cdwrt": 22.11,
+      "cdwrt_align_quality": "CLOSE",
+      "cdwrt_align_distance_s": 45.0,
+      "flow_m3s": 0.001234,
+      "flow_m3s_align_quality": "EXACT",
+      "flow_m3s_align_distance_s": 1.0,
+      "power_kw": 45.2,
+      "power_kw_align_quality": "EXACT",
+      "power_kw_align_distance_s": 3.5,
+      "gap_type": "VALID",
+      "confidence": 0.90,
+      "exclusion_window_id": null,
+      "delta_t_c": -0.17,
+      "lift_c": 4.55
+    },
+    {
+      "timestamp": "2024-10-15T14:15:00Z",
+      "chwst": null,
+      "chwst_align_quality": "MISSING",
+      "chwst_align_distance_s": null,
+      "chwrt": null,
+      "chwrt_align_quality": "MISSING",
+      "chwrt_align_distance_s": null,
+      "cdwrt": null,
+      "cdwrt_align_quality": "MISSING",
+      "cdwrt_align_distance_s": null,
+      "flow_m3s": null,
+      "flow_m3s_align_quality": "MISSING",
+      "flow_m3s_align_distance_s": null,
+      "power_kw": null,
+      "power_kw_align_quality": "MISSING",
+      "power_kw_align_distance_s": null,
+      "gap_type": "COV_CONSTANT",
+      "confidence": 0.0,
+      "exclusion_window_id": null,
+      "delta_t_c": null,
+      "lift_c": null
+    },
+    {
+      "timestamp": "2024-10-15T14:30:00Z",
+      "chwst": 17.61,
+      "chwst_align_quality": "EXACT",
+      "chwst_align_distance_s": 0.0,
+      "chwrt": 17.44,
+      "chwrt_align_quality": "EXACT",
+      "chwrt_align_distance_s": 1.0,
+      "cdwrt": 22.15,
+      "cdwrt_align_quality": "EXACT",
+      "cdwrt_align_distance_s": 0.5,
+      "flow_m3s": 0.001235,
+      "flow_m3s_align_quality": "EXACT",
+      "flow_m3s_align_distance_s": 0.0,
+      "power_kw": 45.5,
+      "power_kw_align_quality": "EXACT",
+      "power_kw_align_distance_s": 2.0,
+      "gap_type": "VALID",
+      "confidence": 0.95,
+      "exclusion_window_id": null,
+      "delta_t_c": -0.17,
+      "lift_c": 4.54
+    }
+  ]
+}
