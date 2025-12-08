@@ -159,11 +159,11 @@ When Stage 1 is "complete", we must have:
 - [x] Domain functions: detectUnits, convertUnits, validatePhysics, computeConfidence
 - [x] Hooks: useStage1Verifier with logging + file I/O
 - [x] Tests: 105/105 passing (98 domain + 5 architecture)
-- [ ] **CLI: Stage0→Stage1 orchestrator** ⬅ THIS IS MANDATORY
-- [ ] Integration test: BarTech dataset end-to-end
-- [ ] Documentation: Usage examples, exit codes
+- [x] **CLI: Stage0→Stage1 orchestrator** ✅ src/orchestration/HtdamCLI.py
+- [x] Integration test: BarTech dataset end-to-end ✅ 483K records processed, HALT correctly detected
+- [x] Documentation: Usage examples, exit codes ✅ In CLI docstring
 
-**Stage 1 is NOT complete until the CLI works.**
+**✅ Stage 1 is NOW complete - CLI validated end-to-end.**
 
 ---
 
@@ -194,7 +194,10 @@ When Stage 1 is "complete", we must have:
 
 - ✅ Stage 0: Complete (filename parsing, 52 tests passing)
 - ✅ Stage 1: Complete (unit verification, 105 tests passing)
-- ⏳ **Stage 0 → Stage 1 CLI: IN PROGRESS**
-- ⏸️ Stage 2: Not started (requires Stage 1 CLI working)
+- ✅ **Stage 0 → Stage 1 CLI: COMPLETE** ✅
+  - Created: `src/orchestration/HtdamCLI.py` (342 lines)
+  - Tested: BarTech dataset (483,181 records, HALT correctly detected)
+  - Exit codes: 0=success, 1=HALT, 2=error
+- 🟢 **Stage 2: READY TO START** (Stage 1 CLI validated)
 
-**Next Action**: Create `src/orchestration/HtdamCLI.py` that runs Stage 0 → Stage 1 pipeline.
+**Next Action**: Begin Stage 2 implementation (Load Normalization + COP Calculation).
