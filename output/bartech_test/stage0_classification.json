@@ -1,0 +1,15 @@
+{
+  "status": "SUCCESS",
+  "feed_map": {
+    "CHWST": "test-data/real-installations/bartech/BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_CHWST_Leaving_Chilled_Water_Temperature_Sensor.csv",
+    "CHWRT": "test-data/real-installations/bartech/BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_CHWRT_Entering_Chilled_Water_Temperature_Sensor.csv",
+    "CDWRT": "test-data/real-installations/bartech/BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_CDWRT_Entering_Condenser_Water_Temperature_Sensor.csv",
+    "POWER": "test-data/real-installations/bartech/BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_Load.csv",
+    "FLOW": "test-data/real-installations/bartech/BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_Water_Flow.csv"
+  },
+  "warnings": [
+    "Multiple CDWRT files found - using highest confidence: BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_CDWRT_Entering_Condenser_Water_Temperature_Sensor.csv",
+    "Multiple POWER files found - using highest confidence: BarTech_160_Ann_St_Level_22_MSSB_Chiller_2_Load.csv"
+  ],
+  "timestamp": "2025-12-08T11:43:31.382910"
+}

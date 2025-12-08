@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
 # Import pure function from domain layer
-from domain.htdam.stage0.parseFilenameMetadata import (
+from src.domain.htdam.stage0.parseFilenameMetadata import (
     parse_filename_metadata,
     detect_feed_type,
     FEED_TYPES
